@@ -1,0 +1,46 @@
+name: "DH Lotto 45"
+version: "2.0.7"
+slug: "dhlotto45"
+description: "DH Lottery Lottoey 6/45 Add-on with MQTT Discovery - Multi-Account Support"
+url: "https://github.com/redchupa/ha-app-dhlottery"
+arch:
+  - amd64
+  - armv7
+  - aarch64
+init: false
+startup: services
+boot: auto
+ingress: true
+ingress_port: 60099
+panel_icon: mdi:ticket
+panel_title: "DH Lotto 45"
+ports:
+  60099/tcp: 60099
+ports_description:
+  60099/tcp: "Web UI and API"
+hassio_api: true
+hassio_role: default
+homeassistant_api: true
+auth_api: true
+options:
+  accounts:
+    - username: ""
+      password: ""
+      enabled: true
+  enable_lotto645: true
+  update_interval: 3600
+  use_mqtt: true
+  mqtt_url: "mqtt://homeassistant.local:1883"
+  mqtt_username: ""
+  mqtt_password: ""
+schema:
+  accounts:
+    - username: str
+      password: password
+      enabled: bool?
+  enable_lotto645: bool
+  update_interval: int(60,86400)?
+  use_mqtt: bool?
+  mqtt_url: str?
+  mqtt_username: str?
+  mqtt_password: password?
