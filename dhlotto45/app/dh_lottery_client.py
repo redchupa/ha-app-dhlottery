@@ -128,35 +128,41 @@ class DhLotteryClient:
         params: dict,
         retry: int = 2,
     ) -> dict[str, Any]:
-        """Login 필요한 page 져옵니다. retry 시 세션 초기화 + 재로그인."""
+        """Login 필요한 page 져옵니다. retry 시 세션 초기화 + 재로그인.
+
+        주의: asyncio.Lock 은 reentrant 가 아니므로 재귀 호출 시 데드락 발생.
+        한 번의 lock 획득 안에서 루프로 재시도한다.
+        """
         async with self._lock:
-            try:
-                return await self.async_get(path, params)
-            except DhLotteryError as e:
-                # DhAPIError(JSON 깨짐), DhLotteryError(타임아웃/네트워크) 모두 동일 복구 경로.
-                # 세션 keep-alive 가 망가졌을 때 ensure_main_mode 만으로는 회복 안 됨.
-                if retry > 0:
+            attempts = retry + 1
+            last_err: Optional[DhLotteryError] = None
+            for attempt in range(1, attempts + 1):
+                try:
+                    return await self.async_get(path, params)
+                except DhLotteryError as e:
+                    # DhAPIError(JSON 깨짐), DhLotteryError(타임아웃/네트워크) 모두 동일 복구 경로.
+                    last_err = e
+                    if attempt >= attempts:
+                        break
                     _LOGGER.info(
                         f"Request failed ({type(e).__name__}: {e}). "
-                        f"Resetting session and re-login (retry={retry})..."
+                        f"Resetting session and re-login (attempt {attempt}/{retry})..."
                     )
                     await self.close()
                     self._create_session()
                     try:
                         await self.async_login()
                     except DhLotteryError as login_err:
-                        # 재로그인 실패 시 한 번 더 시도하지 말고 중단
                         raise DhLotteryLoginError(
                             f"[ERROR] Re-login failed during retry: {login_err}"
                         ) from login_err
-                    return await self.async_get_with_login(path, params, retry - 1)
-                raise DhLotteryLoginError(
-                    f"[ERROR] Login API failed after retries: {e}"
-                )
-            except Exception as ex:
-                raise DhLotteryError(
-                    f"[ERROR] Login page fetch failed: {ex}"
-                ) from ex
+                except Exception as ex:
+                    raise DhLotteryError(
+                        f"[ERROR] Login page fetch failed: {ex}"
+                    ) from ex
+            raise DhLotteryLoginError(
+                f"[ERROR] Login API failed after retries: {last_err}"
+            )
 
     async def async_login(self):
         """Login 수행합니다."""

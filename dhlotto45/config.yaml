@@ -1,5 +1,5 @@
 name: "DH Lotto 45"
-version: "2.0.7"
+version: "2.0.8"
 slug: "dhlotto45"
 description: "DH Lottery Lottoey 6/45 Add-on with MQTT Discovery - Multi-Account Support"
 url: "https://github.com/redchupa/ha-app-dhlottery"

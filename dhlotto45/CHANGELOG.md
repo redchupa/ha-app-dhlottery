@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.8 - 2026-05-07
+
+### Fixed
+- **재시도 시 데드락 해결**: `async_get_with_login()` 이 `async with self._lock:` 안에서 자기 자신을 재귀호출하던 구조를 루프로 변경. asyncio.Lock 은 reentrant 가 아니라 같은 태스크가 두 번 acquire 시도 시 영원히 hang. v2.0.7 이전 코드도 동일한 데드락 잠재성을 가졌으나 일부 경로에서만 발현. 이번에 retry 경로를 통합하면서 데드락이 매번 재현되어 노출됨. 한 번의 lock 안에서 `for attempt in range(...)` 루프로 재시도하도록 리팩토링.
+
 ## 2.0.7 - 2026-05-07
 
 ### Fixed
