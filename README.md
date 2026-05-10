@@ -246,16 +246,14 @@ curl -X POST "http://homeassistant.local:60099/buy/auto?count=3"
   <tr>
     <td align="center">
       <b>Toss (토스)</b><br>
-      <img src="images/toss-donation.png" width="200">
+      <img src="https://raw.githubusercontent.com/redchupa/ha-app-dhlottery/main/images/toss-donation.png" width="200">
     </td>
     <td align="center">
       <b>PayPal</b><br>
-      <img src="images/paypal-donation.png" width="200">
+      <img src="https://raw.githubusercontent.com/redchupa/ha-app-dhlottery/main/images/paypal-donation.png" width="200">
     </td>
   </tr>
 </table>
-
-> 이미지를 표시하려면 `images/toss-donation.png`, `images/paypal-donation.png`를 레포에 업로드하세요.
 
 ---
 
