@@ -1,11 +1,10 @@
-# DH Lottery Home Assistant Add-on (App Build)
+# DH Lottery Home Assistant Add-on
 
 [![License](https://img.shields.io/github/license/redchupa/ha-app-dhlottery)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/redchupa/ha-app-dhlottery?style=social)](https://github.com/redchupa/ha-app-dhlottery/stargazers)
 
-Home Assistant에서 동행복권 로또 6/45를 자동으로 구매하고 분석할 수 있는 애드온의 **단일 빌드(app) 버전**입니다.
-
-> 메인 저장소(다중 애드온, 패치 채널 포함)는 **[ha-addons-dhlottery](https://github.com/redchupa/ha-addons-dhlottery)** 입니다. 이 레포는 단일 애드온만 빠르게 설치하고 싶을 때 사용하세요.
+Home Assistant에서 **동행복권 로또 6/45를 자동으로 구매하고 분석**할 수 있는 애드온입니다.
+실시간 당첨 결과, 통계 분석(Hot/Cold), 예치금 관리, MQTT Discovery, REST API를 한 번에 제공합니다.
 
 ---
 
@@ -18,8 +17,22 @@ Home Assistant에서 동행복권 로또 6/45를 자동으로 구매하고 분�
 - ✅ **통계 분석**: Hot / Cold 번호, 출현 빈도
 - ✅ **예치금 관리**: 잔액 및 구매 가능 금액 모니터링
 - ✅ **MQTT Discovery**: HA 자동 통합
-- ✅ **REST API**: 외부 시스템 연동
+- ✅ **REST API**: 외부 시스템 연동 + Swagger UI
 - ✅ **모바일 알림**: 구매 완료, 당첨번호 발표 알림
+
+---
+
+## 목차
+
+- [설치](#설치)
+- [사용 전 필수 체크](#사용-전-필수-체크)
+- [생성되는 센서](#생성되는-센서)
+- [버튼 엔티티](#버튼-엔티티)
+- [REST API](#rest-api)
+- [문제 해결](#문제-해결)
+- [참고 사항](#참고-사항)
+- [후원](#후원)
+- [라이선스](#라이선스)
 
 ---
 
@@ -36,53 +49,169 @@ Home Assistant에서 동행복권 로또 6/45를 자동으로 구매하고 분�
 
 ### 애드온 설치
 
-1. Add-on Store에서 **DH Lotto 45 (App)** 선택
+1. Add-on Store에서 **DH Lotto 45** 선택
 2. **Install** 클릭
 3. Configuration 탭에서 설정:
 
 ```yaml
 username: ""        # 동행복권 아이디
 password: ""        # 동행복권 비밀번호
-update_interval: 3600
+enable_lotto645: true
+update_interval: 3600   # 센서 갱신 주기(초), 기본 1시간
 use_mqtt: true
 mqtt_url: "mqtt://homeassistant.local:1883"
 mqtt_username: ""
 mqtt_password: ""
 ```
 
-4. **Start** 클릭 → Log 탭에서 "Login successful" 확인
+4. **Start** 클릭 → **Log** 탭에서 `Login successful` 확인
 
 ---
 
 ## 사용 전 필수 체크
 
-1. 동행복권 사이트 https://www.dhlottery.co.kr 에 직접 들어가서
+1. 동행복권 사이트 https://www.dhlottery.co.kr 에서  
    회원가입 → 로그인 → 마이페이지 → **건전구매 서약하기** (필수)
-2. 예치금 충전 (자동 구매에 필요)
+2. 자동 구매를 위해 **예치금 충전** 필요
 
 ---
 
-## 생성되는 엔티티 / API
+## 생성되는 센서
 
-`ha-addons-dhlottery`와 동일한 센서·버튼·REST API를 제공합니다. 자세한 항목은 메인 저장소 [README](https://github.com/redchupa/ha-addons-dhlottery#readme)를 참고하세요.
+애드온을 시작하면 다음 센서들이 자동으로 생성됩니다.
 
-| 분류 | 엔티티/API 예시 |
-|---|---|
-| 예치금 | `sensor.dhlotto_<id>_lotto45_balance` |
-| 당첨번호 | `sensor.dhlotto_<id>_lotto645_winning_numbers`, `number1`~`number6`, `bonus` |
-| 상금/당첨자 | `first_prize`/`first_winners` ~ `fifth_prize`/`fifth_winners` |
-| 통계 | `top_frequency_number`, `hot_numbers`, `cold_numbers`, `total_winning` |
-| 구매 내역 | `latest_purchase`, `purchase_history_count`, `game_1`~`game_5` |
-| 자동 구매 버튼 | `button.dhlotto_<id>_buy_auto_1`, `buy_auto_5` |
-| REST API | `http://homeassistant.local:60099/{health,balance,stats,buy,buy/auto,buy/history}` |
+<details>
+<summary><b>계정 정보 센서</b></summary>
 
-Swagger UI: `http://homeassistant.local:60099/docs`
+### 동행복권 예치금
+- **센서 ID**: `sensor.dhlotto_{username}_lotto45_balance`
+- **단위**: KRW
+- **추가 속성**:
+  - `purchase_available`: 구매 가능 금액
+  - `reservation_purchase`: 예약 구매 금액
+  - `withdrawal_request`: 출금 신청 중 금액
+  - `this_month_accumulated`: 이번 달 누적 구매 금액
+
+</details>
+
+<details>
+<summary><b>로또 당첨 결과 센서</b></summary>
+
+### 기본 정보
+- `sensor.dhlotto_{username}_lotto645_round` — 최신 회차
+- `sensor.dhlotto_{username}_lotto645_draw_date` — 추첨일 (YYYY-MM-DD)
+- `sensor.dhlotto_{username}_lotto645_winning_numbers` — 전체 당첨번호
+
+### 당첨번호 (개별)
+- `sensor.dhlotto_{username}_lotto645_number1` ~ `number6`
+- `sensor.dhlotto_{username}_lotto645_bonus`
+
+</details>
+
+<details>
+<summary><b>상금 및 당첨자 정보 센서</b></summary>
+
+### 총 판매액
+- `sensor.dhlotto_{username}_lotto645_total_sales` (KRW)
+
+### 등수별 정보
+각 등수마다 **상금**과 **당첨자** 센서가 생성됩니다:
+
+- 1등: `first_prize`, `first_winners`
+- 2등: `second_prize`, `second_winners`
+- 3등: `third_prize`, `third_winners`
+- 4등: `fourth_prize`, `fourth_winners`
+- 5등: `fifth_prize`, `fifth_winners`
+- 전체: `total_winners`
+
+</details>
+
+<details>
+<summary><b>번호 통계 분석 센서</b></summary>
+
+- `sensor.dhlotto_{username}_lotto45_top_frequency_number` — 최다 출현 번호 (최근 50회차)
+- `sensor.dhlotto_{username}_lotto45_hot_numbers` — 핫 넘버 (최근 20회차 상위 10개)
+- `sensor.dhlotto_{username}_lotto45_cold_numbers` — 콜드 넘버 (최근 20회차 하위 10개)
+- `sensor.dhlotto_{username}_lotto45_total_winning` — 총 당첨금 (최근 1년, KRW)
+
+#### `total_winning` 추가 속성
+- `total_purchase`: 총 구매 금액
+- `total_purchase_count`: 총 구매 횟수
+- `total_winning_count`: 총 당첨 횟수
+- `win_rate`: 당첨률 (%)
+- `roi`: 수익률 (%)
+- `rank_distribution`: 등수별 당첨 횟수
+
+</details>
+
+<details>
+<summary><b>구매 내역 센서</b></summary>
+
+- `sensor.dhlotto_{username}_lotto45_latest_purchase` — 가장 최근 구매 정보
+- `sensor.dhlotto_{username}_lotto45_purchase_history_count` — 구매 기록 수 (최근 1주)
+- `sensor.dhlotto_{username}_lotto45_game_1` ~ `game_5` — 구매한 게임별 번호
+
+#### `latest_purchase` 추가 속성
+`round_no`, `barcode`, `result`, `games`, `games_count`
+
+#### `game_*` 추가 속성
+`slot`(A~E), `mode`(자동/수동/반자동), `numbers`, `round_no`, `result`
+
+</details>
+
+<details>
+<summary><b>시스템 센서</b></summary>
+
+- `sensor.dhlotto_{username}_lotto45_last_update` — 마지막 업데이트 시간
+
+</details>
 
 ---
 
-## 자동화 / 대시보드 예시
+## 버튼 엔티티
 
-자동화 YAML 예시와 대시보드 카드 예시는 메인 저장소 [ha-addons-dhlottery](https://github.com/redchupa/ha-addons-dhlottery)의 첨부 yaml을 그대로 사용 가능합니다.
+MQTT Discovery를 활성화하면 자동 구매 버튼이 생성됩니다.
+
+- `button.dhlotto_{username}_buy_auto_1` — 1게임 자동 구매
+- `button.dhlotto_{username}_buy_auto_5` — 5게임 자동 구매 (주간 최대)
+
+### 사용 시 자동 체크
+- **구매 가능 시간**: 평일·일 06:00–24:00, 토 06:00–20:00
+- **주간 한도**: 최대 5게임
+- **예치금**: 게임당 1,000원
+
+---
+
+## REST API
+
+포트 **60099** 로 접근 가능합니다.
+
+**Base URL**: `http://homeassistant.local:60099`
+
+### 조회 (GET)
+- `/health` — 상태 확인
+- `/balance` — 예치금
+- `/stats` — 통계 정보
+- `/buy/history` — 구매 내역
+
+### 실행 (POST)
+- `/random?count=6&games=1` — 랜덤 번호 생성
+- `/check` — 당첨 확인
+- `/buy` — 로또 구매
+- `/buy/auto?count=1` — 자동 구매
+
+### 예시
+
+```bash
+curl http://homeassistant.local:60099/health
+curl http://homeassistant.local:60099/balance
+curl -X POST "http://homeassistant.local:60099/random?count=6&games=2"
+curl -X POST "http://homeassistant.local:60099/buy/auto?count=3"
+```
+
+### Swagger UI
+- 외부 직접 접근: `http://homeassistant.local:60099/docs`
+- HA Ingress 경로: `/api-docs`
 
 ---
 
@@ -90,40 +219,43 @@ Swagger UI: `http://homeassistant.local:60099/docs`
 
 | 증상 | 해결 |
 |---|---|
-| 로그인 실패 | 동행복권 웹사이트 직접 로그인 테스트 → 5회 실패 시 잠금, 잠시 대기 |
-| 센서 미갱신 | `update_interval` 확인, `homeassistant.update_entity` 수동 호출 |
-| MQTT 센서 미생성 | `use_mqtt: true` 확인, MQTT 브로커 동작 확인 |
-| 구매 실패 | 시간(평일 06–24시, 토 06–20시) / 예치금 / 주간 5게임 제한 확인 |
-| 포트 충돌 | 60099 포트 다른 애드온 확인 |
+| 로그인 실패 | 동행복권 웹에서 직접 로그인 테스트 → 5회 실패 시 잠금. 잠시 대기 후 재시도. 2차 인증(OTP) 계정은 미지원. |
+| 센서 미갱신 | `update_interval` 확인. `homeassistant.update_entity` 서비스로 수동 호출. |
+| MQTT 센서 미생성 | `use_mqtt: true` / MQTT 브로커 동작 / `mqtt_url` 정확성 확인. 애드온 재시작. |
+| 구매 실패 | 시간 / 예치금 / 주간 5게임 한도 / Log 탭 에러 메시지 확인. |
+| 포트 충돌 | 60099 점유 애드온 확인. |
 
 ---
 
 ## 참고 사항
 
-- **구매 시간**: 평일·일 06:00–24:00, 토 06:00–20:00
-- **주간 제한**: 최대 5게임
+- **구매 가능 시간**: 평일·일 06:00–24:00, 토 06:00–20:00
+- **주간 한도**: 최대 5게임
 - **게임당 비용**: 1,000원
-- **기본 업데이트**: 3600초 (1시간)
-- **보안**: 비밀번호 암호화 저장, HTTPS 통신
+- **기본 갱신 주기**: 3600초 (1시간)
+- **수동 갱신**: Developer Tools → Services → `homeassistant.update_entity`
+- **보안**: 비밀번호 암호화 저장, 세션 자동 관리, HTTPS
 
 ---
 
 ## 후원
 
-이 애드온이 유용하셨다면 커피 한 잔 후원 부탁드립니다!
+이 애드온이 유용하셨다면 커피 한 잔 후원 부탁드립니다! 🙏
 
 <table>
   <tr>
     <td align="center">
       <b>Toss (토스)</b><br>
-      <img src="https://raw.githubusercontent.com/redchupa/ha-addons-dhlottery/main/images/toss-donation.png" width="200">
+      <img src="images/toss-donation.png" width="200">
     </td>
     <td align="center">
       <b>PayPal</b><br>
-      <img src="https://raw.githubusercontent.com/redchupa/ha-addons-dhlottery/main/images/paypal-donation.png" width="200">
+      <img src="images/paypal-donation.png" width="200">
     </td>
   </tr>
 </table>
+
+> 이미지를 표시하려면 `images/toss-donation.png`, `images/paypal-donation.png`를 레포에 업로드하세요.
 
 ---
 
@@ -131,7 +263,6 @@ Swagger UI: `http://homeassistant.local:60099/docs`
 
 - **Issues**: https://github.com/redchupa/ha-app-dhlottery/issues
 - **Discussions**: https://github.com/redchupa/ha-app-dhlottery/discussions
-- **메인 저장소**: https://github.com/redchupa/ha-addons-dhlottery
 
 ---
 
@@ -146,6 +277,16 @@ MIT License — [LICENSE](LICENSE)
 본 프로젝트는 동행복권과 공식적인 관계가 없는 개인 학습용 프로젝트입니다.
 모든 데이터 요청은 사용자 환경에서 직접 이루어지며, 데이터를 외부에 저장/중계하지 않습니다.
 사용에 따른 책임은 사용자에게 있습니다.
+
+---
+
+## 기여
+
+1. Fork
+2. Feature 브랜치 생성 (`git checkout -b feature/AmazingFeature`)
+3. 커밋 (`git commit -m 'Add some AmazingFeature'`)
+4. Push (`git push origin feature/AmazingFeature`)
+5. Pull Request 생성
 
 ---
 
