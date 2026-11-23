@@ -172,8 +172,8 @@ class MQTTDiscovery:
             "device": {
                 "identifiers": [device_identifier],
                 "name": device_name,
-                "manufacturer": "우*만",
-                "model": "토스 1000-1261-7813",
+                "manufacturer": "dhlottery.co.kr",
+                "model": "토스 1000-1261-7813 우*만",
                 "sw_version": "커피 한잔은 사랑입니다",
             },
         }
@@ -302,8 +302,8 @@ class MQTTDiscovery:
             "device": {
                 "identifiers": [device_identifier],
                 "name": device_name,
-                "manufacturer": "우*만",
-                "model": "토스 1000-1261-7813",
+                "manufacturer": "dhlottery.co.kr",
+                "model": "토스 1000-1261-7813 우*만",
                 "sw_version": "커피 한잔은 사랑입니다",
             },
         }
@@ -419,8 +419,8 @@ class MQTTDiscovery:
             "device": {
                 "identifiers": [device_identifier],
                 "name": device_name,
-                "manufacturer": "우*만",
-                "model": "토스 1000-1261-7813",
+                "manufacturer": "dhlottery.co.kr",
+                "model": "토스 1000-1261-7813 우*만",
                 "sw_version": "커피 한잔은 사랑입니다",
             },
         }
