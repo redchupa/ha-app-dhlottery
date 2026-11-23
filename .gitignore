@@ -1,0 +1,22 @@
+# 분석용 APK (저작권물 — 커밋/공개 금지)
+*.apk
+apk_*/
+복똑방.apk
+
+# 리버스 엔지니어링 분석 산출물 / API 응답 샘플 / 패킷 캡처
+# (.har 은 로그인 세션 쿠키를 포함할 수 있어 커밋 금지)
+_api_samples/
+collect_api_samples.ps1
+*.har
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# HA 대시보드 등 로컬 백업
+_backups/
+
+# 내부 유지보수/리버스 엔지니어링 메모 (공개 제외)
+dhlotto45/REVERSE_ENGINEERING.md
