@@ -1,6 +1,8 @@
 import datetime
 import json
 import logging
+
+import aiohttp
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import List, Dict, Optional
@@ -36,6 +38,14 @@ def _rank_drawed_to_result(rank: int, drawed: bool) -> str:
 
 class DhLotto645Error(DhLotteryError):
     """DH Lotto 645 exception class."""
+
+
+def uncertain_order_message(ex) -> str:
+    """주문을 보낸 뒤 결과를 확인하지 못했을 때의 안내(같은 주문을 다시 보내지 않는다)."""
+    return (
+        "⚠️ 로또 구매 요청은 보냈지만 결과를 확인하지 못했습니다(응답 지연·형식 오류). 구매가 됐을 수 있으니 "
+        f"동행복권 구매내역을 먼저 확인한 뒤 다시 시도하세요. (원인: {str(ex)[:120]})"
+    )
 
 
 class DhLotto645SelMode(StrEnum):
@@ -210,12 +220,13 @@ class DhLotto645:
 
             def _check_buy_time() -> None:
                 """Check if purchase time is valid."""
-                _now = datetime.datetime.now()
+                # 컨테이너 시간대와 상관없이 한국 시간으로 판단(토요일은 20:00 부터 판매 마감)
+                _now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
                 if _now.hour < 6:
                     raise DhLotto645Error(
                         "[ERROR] Purchase time not available. (Purchase available from 6:00 to 24:00)"
                     )
-                if _now.weekday() == 5 and _now.hour > 20:
+                if _now.weekday() == 5 and _now.hour >= 20:
                     raise DhLotto645Error(
                         "[ERROR] Purchase time not available. (Saturday purchase until 20:00, Sunday from 6:00)"
                     )
@@ -322,12 +333,21 @@ class DhLotto645:
             buy_items = items[:buy_count]
             live_round = str(await self.async_get_latest_round_no() + 1)
 
+            # 이중 결제 방지: 주문(execBuy.do)이 서버에 닿았을 수 있는 실패(응답 지연·응답 해석 실패)는
+            # 절대 다시 보내지 않는다. 다시 시도하는 건 '주문을 보내기 전' 단계와 '연결 자체가 안 된' 경우뿐.
             for attempt in range(2):
                 try:
                     direct = (await get_user_ready_socket())
                     param = make_param(buy_items)
-                    _LOGGER.info(f"[PURCHASE] Sending to server - param: {param}")
-                    _LOGGER.info(f"[PURCHASE] buy_items before param: {[(item.mode, item.numbers) for item in buy_items]}")
+                except Exception as ex:  # 주문 전 준비 단계 → 재시도 안전
+                    if attempt == 0:
+                        _LOGGER.warning(f"[PURCHASE] 주문 준비 실패: {ex}. mainMode=N 확인 후 한 번 더 시도")
+                        await self.client._async_ensure_main_mode_normal()
+                        continue
+                    raise DhLotto645Error(f"[ERROR] 6/45 purchase failed before ordering. (Reason: {ex})") from ex
+                _LOGGER.info(f"[PURCHASE] Sending to server - param: {param}")
+                _LOGGER.info(f"[PURCHASE] buy_items before param: {[(item.mode, item.numbers) for item in buy_items]}")
+                try:
                     resp = await self.client.session.post(
                         url="https://ol.dhlottery.co.kr/olotto/game/execBuy.do",
                         data={
@@ -340,22 +360,26 @@ class DhLotto645:
                         },
                         timeout=10,
                     )
-                    response = await resp.json()
-                    if response.get("result", {}).get("resultCode") != "100":
-                        raise DhLotto645Error(
-                            f"[ERROR] 6/45 purchase failed. (Reason: {response.get('result', {}).get('resultMsg', 'Unknown')})"
-                        )
-                    return parse_result(response["result"])
-                except (DhLotto645Error, DhLotteryError):
-                    raise
-                except Exception as ex:
+                except aiohttp.ClientConnectorError as ex:  # 서버에 연결조차 못 함 → 주문 안 감, 재시도 안전
                     if attempt == 0:
-                        _LOGGER.warning(f"[PURCHASE] Attempt 1 failed: {ex}. Retrying with mainMode=N ensure...")
+                        _LOGGER.warning(f"[PURCHASE] 주문 서버 연결 실패: {ex}. 한 번 더 시도")
                         await self.client._async_ensure_main_mode_normal()
-                    else:
-                        raise DhLotto645Error(
-                            f"[ERROR] 6/45 purchase failed. (Reason: {str(ex)})"
-                        ) from ex
+                        continue
+                    raise DhLotto645Error(f"[ERROR] 6/45 purchase failed: cannot reach server. (Reason: {ex})") from ex
+                except Exception as ex:  # 보냈는데 응답을 못 받음 → 구매됐을 수 있음, 재시도 금지
+                    raise DhLotto645Error(uncertain_order_message(ex)) from ex
+                try:
+                    response = await resp.json(content_type=None)
+                except Exception as ex:  # 응답을 못 읽음 → 구매됐을 수 있음, 재시도 금지
+                    raise DhLotto645Error(uncertain_order_message(ex)) from ex
+                if not isinstance(response, dict):
+                    raise DhLotto645Error(uncertain_order_message("unexpected response"))
+                if response.get("result", {}).get("resultCode") != "100":
+                    raise DhLotto645Error(
+                        f"[ERROR] 6/45 purchase failed. (Reason: {response.get('result', {}).get('resultMsg', 'Unknown')})"
+                    )
+                return parse_result(response["result"])
+            raise DhLotto645Error("[ERROR] 6/45 purchase failed. (no attempt completed)")
         except DhLotteryError:
             raise
         except Exception as ex:

@@ -107,5 +107,25 @@ check("<" not in F.purchase_message("Account_1", "x", "error", "<b>실패</b>", 
 scr = F.scrub_text("mqtt://u:p@203.0.113.9:1883 a@b.com " + "Z" * 40)
 check("p@" not in scr and "203.0.113.9" not in scr and "a@b.com" not in scr and "Z" * 40 not in scr, "진단 리포트 가림")
 
+
+# ------------------------------------------------ 5. real IDs never leave the add-on
+print("[실제 아이디 가림]")
+M.accounts.clear()
+M.accounts["sampleid01"] = M.AccountData("sampleid01", "pw")
+msg = M._alias_text("로그인 실패: sampleid01 / " + M.mask_username("sampleid01") + " 확인")
+check("sampleid01" not in msg and "sa*" not in msg and msg.count("Account_1") == 2, f"응답·진단 문구의 아이디 → 별칭 ({msg})")
+check(M._alias_text(None) is None and M._alias_text(5) == 5, "문자열 아닌 값은 그대로")
+route_src = src[src.index("async def api_dashboard"):src.index("DATA_DIR = ")]
+check("_alias_text(v.get(\"state\"))" in route_src and "_alias_text(account.last_action" in route_src,
+      "대시보드 응답 문구에 별칭 적용")
+check("FT.scrub_text(_alias_text(" in src, "진단 리포트에 별칭 적용")
+
+# ------------------------------------------------ 6. purchase code: no blind resend after sending an order
+print("[주문 재전송 금지]")
+lsrc = open(os.path.join(APP, "dh_lotto_645.py"), encoding="utf-8").read()
+order = lsrc[lsrc.index("execBuy.do") - 1500:lsrc.index("execBuy.do") + 2500]
+check("uncertain_order_message" in order and "ClientConnectorError" in order, "로또 주문 후 실패는 재시도 안 함(연결 실패만)")
+psrc = open(os.path.join(APP, "dh_pension_browser.py"), encoding="utf-8").read()
+check(len(re.findall(r'"doVerify\(\)"', psrc)) == 1 and psrc.count('"doOrder()"') == 2, "연금 doVerify 1곳·doOrder 자동/수동 각 1곳")
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

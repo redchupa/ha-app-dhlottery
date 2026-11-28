@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.11.3
+Lotto 45 Add-on Main Application v2.11.4
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -116,7 +116,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.11.3"
+APP_VERSION = "2.11.4"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -2230,6 +2230,19 @@ def _aliases() -> dict:
     return account_aliases(list(accounts.keys()))
 
 
+def _alias_text(value):
+    """밖으로 내보내는 문자열에서 실제 아이디(와 일부만 가린 표기)를 Account_N 으로 바꾼다."""
+    if not isinstance(value, str) or not value:
+        return value
+    for u, (_aid, label) in _aliases().items():
+        if len(u) >= 4:
+            value = value.replace(u, label)
+            m = mask_username(u)
+            if m != u:
+                value = value.replace(m, label)
+    return value
+
+
 def _client_host(request: Request) -> str:
     return request.client.host if request.client else ""
 
@@ -2286,7 +2299,7 @@ async def api_dashboard(request: Request):
     for username, account in accounts.items():
         aid, label = aliases[username]
         sensors = {
-            k: {"state": v.get("state"), "attributes": v.get("attributes") or {}, "ts": v.get("ts")}
+            k: {"state": _alias_text(v.get("state")), "attributes": v.get("attributes") or {}, "ts": v.get("ts")}
             for k, v in account.sensor_cache.items()
             if k not in _DASHBOARD_EXCLUDED_SENSORS
         }
@@ -2298,7 +2311,8 @@ async def api_dashboard(request: Request):
             "cooldown_remaining": round(purchase_guard.get_remaining_cooldown(username), 1),
             "manual_numbers": account.manual_numbers_state,
             "pension_manual": account.pension_manual_state,
-            "last_action": account.last_action,
+            "last_action": ({**account.last_action, "message": _alias_text(account.last_action.get("message"))}
+                            if account.last_action else None),
             "sensors": sensors,
         })
     actions = {}
@@ -3051,7 +3065,7 @@ async def _build_diagnostics() -> str:
     lines.append("")
     lines.append("--- 최근 로그 ---")
     lines.extend(_ring_log.tail(150))
-    return FT.scrub_text("\n".join(lines))
+    return FT.scrub_text(_alias_text("\n".join(lines)))
 
 
 @app.get("/api/diagnostics")

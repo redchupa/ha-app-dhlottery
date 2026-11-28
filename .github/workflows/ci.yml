@@ -40,6 +40,7 @@ jobs:
           python dhlotto45/tests/test_security.py
           python dhlotto45/tests/test_mqtt.py
           python dhlotto45/tests/test_pension_flow.py
+          python dhlotto45/tests/test_lotto_buy.py
 
       # 휴대폰·태블릿·PC 폭 화면 점검(헤드리스 Chrome, 러너에 기본 설치됨)
       - name: UI layout test
