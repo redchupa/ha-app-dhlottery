@@ -63,6 +63,32 @@ LOGIN_PW_MAXLEN = 20
 RSA_READY_JS = "(() => typeof rsa !== 'undefined' && !!rsa && rsa.n != null)()"
 
 
+# 크로미움 DevTools 연결 대기: 0.5초 x 60회 ≈ 30초(zendriver 기본 ≈ 2.5초), 기동 2회 시도.
+BROWSER_CONNECT_INTERVAL = 0.5
+BROWSER_CONNECT_MAX_TRIES = 60
+BROWSER_START_ATTEMPTS = 2
+
+
+def browser_connect_kwargs(zd):
+    """zd.start 에 넘길 연결 대기 옵션. 설치된 zendriver 가 지원할 때만 넣는다.
+
+    애드온 이미지는 zendriver 를 범위(>=0.17,<1.0)로 설치하므로 버전에 따라
+    Config 인자가 없을 수 있다 → 시그니처를 확인해 없으면 기본값으로 둔다.
+    """
+    try:
+        import inspect
+
+        params = inspect.signature(zd.Config.__init__).parameters
+    except Exception:  # noqa: BLE001
+        return {}
+    out = {}
+    if "browser_connection_timeout" in params:
+        out["browser_connection_timeout"] = BROWSER_CONNECT_INTERVAL
+    if "browser_connection_max_tries" in params:
+        out["browser_connection_max_tries"] = BROWSER_CONNECT_MAX_TRIES
+    return out
+
+
 def validate_login_credentials(username, password):
     """브라우저 로그인 전 계정 값 검사(순수 함수). 문제가 있으면 DhPensionBrowserError.
 
@@ -305,12 +331,7 @@ class DhPensionBrowser:
                 f"[PENSION-BR] 브라우저 기동 (headless={self.headless}, "
                 f"exe={self.executable_path or 'auto'})"
             )
-            browser = await zd.start(
-                headless=self.headless,
-                sandbox=False,  # Docker/root 환경 → --no-sandbox
-                browser_executable_path=self.executable_path,
-                browser_args=browser_args,
-            )
+            browser = await self._start_browser(zd, browser_args)
             tab = await browser.get("about:blank")
 
             await self._install_dialog_autoaccept(tab, cdp_page)
@@ -335,6 +356,47 @@ class DhPensionBrowser:
             self._log.debug(
                 f"[PENSION-BR] 세션 종료 ({time.monotonic() - t0:.1f}s)"
             )
+
+    async def _start_browser(self, zd, browser_args):
+        """크로미움 기동 + DevTools 연결. 느린 기기를 위해 연결 대기를 늘리고 1회 재시도.
+
+        zendriver 기본값은 0.25초 x 10회(약 2.5초)만 DevTools 응답을 기다린다. 저사양
+        기기(라즈베리파이 등)·부하 상황에서는 크로미움 첫 기동이 이보다 오래 걸려
+        "Failed to connect to browser" 가 난다(오류문의 root/sandbox 안내는 이미
+        sandbox=False 라 해당 없음).
+        """
+        kwargs = dict(
+            headless=self.headless,
+            sandbox=False,  # Docker/root 환경 → --no-sandbox
+            browser_executable_path=self.executable_path,
+            browser_args=browser_args,
+        )
+        kwargs.update(browser_connect_kwargs(zd))
+        last_err = None
+        for attempt in range(1, BROWSER_START_ATTEMPTS + 1):
+            t0 = time.monotonic()
+            try:
+                browser = await zd.start(**kwargs)
+                self._log.info(
+                    f"[PENSION-BR] 브라우저 연결 ({time.monotonic() - t0:.1f}s, "
+                    f"시도 {attempt}/{BROWSER_START_ATTEMPTS})"
+                )
+                return browser
+            except Exception as e:  # noqa: BLE001
+                last_err = e
+                self._log.warning(
+                    f"[PENSION-BR] 브라우저 연결 실패 ({time.monotonic() - t0:.1f}s, "
+                    f"시도 {attempt}/{BROWSER_START_ATTEMPTS}): "
+                    f"{' '.join(str(e).split())[:200]}"
+                )
+                if attempt < BROWSER_START_ATTEMPTS:
+                    await asyncio.sleep(3)
+        raise DhPensionBrowserError(
+            "헤드리스 브라우저(크로미움)를 시작하지 못했습니다. HA 기기의 메모리·CPU 가 "
+            "부족하거나 다른 작업으로 바쁠 때 발생합니다. 잠시 후 다시 시도하고, 계속되면 "
+            "애드온을 재시작하세요. "
+            f"(원인: {' '.join(str(last_err).split())[:200]})"
+        ) from last_err
 
     async def _do_buy(self, count: int) -> dict:
         async def work(tab):

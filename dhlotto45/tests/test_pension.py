@@ -16,7 +16,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "app"))
 
 from dh_pension_browser import (  # noqa: E402
+    BROWSER_CONNECT_INTERVAL,
+    BROWSER_CONNECT_MAX_TRIES,
     DhPensionBrowserError,
+    browser_connect_kwargs,
     classify_purchase_failure,
     is_login_success_url,
     validate_login_credentials,
@@ -89,6 +92,33 @@ check(is_login_success_url(B + "/login/securityLoginCheck.do") is False, "로그
 check(is_login_success_url("about:blank") is False, "about:blank 실패")
 check(is_login_success_url("") is False, "빈 URL 실패")
 check(is_login_success_url(None) is False, "None URL 실패")
+
+# ------------------------------------------------ browser_connect_kwargs
+print("[browser_connect_kwargs]")
+
+
+class _ZdNew:
+    class Config:
+        def __init__(self, browser_connection_timeout=0.25, browser_connection_max_tries=10):
+            pass
+
+
+class _ZdOld:
+    class Config:
+        def __init__(self, headless=True):
+            pass
+
+
+class _ZdBroken:
+    Config = None
+
+
+kw = browser_connect_kwargs(_ZdNew)
+check(kw == {"browser_connection_timeout": BROWSER_CONNECT_INTERVAL,
+             "browser_connection_max_tries": BROWSER_CONNECT_MAX_TRIES}, "지원 버전 → 연결대기 옵션")
+check(BROWSER_CONNECT_INTERVAL * BROWSER_CONNECT_MAX_TRIES >= 20, "연결대기 총 20초 이상")
+check(browser_connect_kwargs(_ZdOld) == {}, "미지원 버전 → 빈 옵션")
+check(browser_connect_kwargs(_ZdBroken) == {}, "Config 이상 → 빈 옵션(예외 없음)")
 
 # ------------------------------------------------ classify_purchase_failure
 print("[classify_purchase_failure]")
