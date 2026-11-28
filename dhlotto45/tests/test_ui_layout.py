@@ -245,11 +245,21 @@ async def run():
                               " gauges: c.querySelectorAll('.gauge').length, visit: c.querySelectorAll('.claim.visit').length,"
                               " fill: g ? g.style.width : '', ics: Array.from(c.querySelectorAll('button')).some(b => b.textContent.indexOf('.ics') >= 0),"
                               " guide: !!c.querySelector('[aria-controls=fold-ics-guide]'),"
+                              " budget: !!c.querySelector('.budget-edit input'), cal: !!c.querySelector('[aria-controls=fold-cal-connect]'),"
                               " wide: c.scrollWidth > c.clientWidth + 1 }; })())")
             check(lab and lab["luck"] and lab["gauges"] == 2 and lab["visit"] == 1 and lab["fill"].endswith("%") and lab["ics"],
                   f"{name}: 럭키 랩 카드(운 지수·예산 게이지·수령 기한·캘린더) {lab}")
             check(lab and not lab["wide"], f"{name}: 럭키 랩 카드가 화면 폭 안에 들어감")
             check(lab and lab["guide"], f"{name}: 캘린더 받기 사용 안내(접기) 있음")
+            check(lab and lab["budget"] and lab["cal"], f"{name}: 카드 안 월 예산 입력칸·HA 캘린더 연결 방법")
+            if mobile:
+                await tab.evaluate("document.querySelector('[aria-controls=fold-cal-connect]').click()")
+                cal_open = await _wait(tab, "(() => { const b = document.getElementById('fold-cal-connect');"
+                                            " return b && !b.hidden && b.querySelectorAll('.cred input').length === 3; })()")
+                g2 = await _eval(tab, METRICS_JS)
+                check(cal_open and not g2["overflow"] and not g2["small"] and not g2["inputs"] and not g2["taps"],
+                      f"{name}: HA 캘린더 연결 방법 펼침(주소·아이디·비밀번호 복사칸) {g2['inputs']} {g2['taps']}")
+                await tab.evaluate("document.querySelector('[aria-controls=fold-cal-connect]').click()")
             if mobile:
                 await tab.evaluate("document.querySelector('[aria-controls=fold-ics-guide]').click()")
                 opened = await _wait(tab, "(() => { const b = document.getElementById('fold-ics-guide');"

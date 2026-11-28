@@ -33,6 +33,7 @@ print("[API 보호 규칙]")
 src = open(os.path.join(APP, "main.py"), encoding="utf-8").read()
 tree = ast.parse(src)
 PUBLIC_GET = {"/", "/health", "/accounts", "/api/ingress"}  # 별칭·상태만 내보내는 공개 경로
+AUTH_GET = {"/calendar.ics"}  # Ingress 대신 Basic 인증으로 보호(HA Remote calendar 구독용)
 routes = []
 for node in tree.body:
     if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)):
@@ -46,6 +47,10 @@ for method, path, body in routes:
     csrf = "_require_csrf(request)" in body or "csrf_ok(DASHBOARD_CSRF_TOKEN" in body
     if method != "get":
         check(ingress and csrf, f"{method.upper()} {path}: Ingress + CSRF 필수")
+    elif path in AUTH_GET:
+        # HA Remote calendar 가 Ingress 밖에서 가져가는 경로: 비밀번호(Basic 인증) 검사가 맨 앞에 있어야 한다
+        first = body.index("IN.basic_auth_ok(") if "IN.basic_auth_ok(" in body else -1
+        check(not ingress and 0 <= first < body.index("_calendar_body()"), f"GET {path}: 비밀번호 검사 후에만 내용 반환")
     elif path not in PUBLIC_GET:
         check(ingress, f"GET {path}: Ingress 필수")
 for method, path, body in routes:

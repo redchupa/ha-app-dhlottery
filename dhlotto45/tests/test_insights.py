@@ -331,5 +331,61 @@ check(claim_notes == [], "1년 가까이 남은 기한은 리마인더 없음")
 snap = M._insight_snapshot()
 check(snap["accounts"][0]["label"] == "Account_1" and "sampleid" not in json.dumps(snap, ensure_ascii=False), "인사이트 응답에 별칭만")
 
+
+# ------------------------------------------------ HA calendar feed (Remote calendar, Basic auth)
+print("[HA 캘린더 구독 주소]")
+import base64  # noqa: E402
+
+
+def basic(u, p):
+    return "Basic " + base64.b64encode(f"{u}:{p}".encode()).decode()
+
+
+check(I.basic_auth_ok(basic("dhlotto", "s3cret-pass"), "dhlotto", "s3cret-pass"), "올바른 아이디·비밀번호")
+check(not I.basic_auth_ok(basic("dhlotto", "wrong"), "dhlotto", "s3cret-pass") and not I.basic_auth_ok(basic("x", "s3cret-pass"), "dhlotto", "s3cret-pass"), "틀린 값 거부")
+check(not I.basic_auth_ok(None, "dhlotto", "p") and not I.basic_auth_ok("Bearer x", "dhlotto", "p") and not I.basic_auth_ok("Basic !!!", "dhlotto", "p")
+      and not I.basic_auth_ok(basic("dhlotto", ""), "dhlotto", "") and not I.basic_auth_ok("Basic " + base64.b64encode(b"nocolon").decode(), "dhlotto", "p"), "형식 오류·빈 비밀번호 거부")
+
+
+class Req:
+    def __init__(self, headers=None, host="172.30.32.2"):
+        self.headers = headers or {}
+        self.client = type("C", (), {"host": host})()
+
+
+M._feature_state = {}
+M._calendar_fetch["at"] = 0.0
+pw = M._calendar_secret()
+check(len(pw) >= 20 and M._calendar_secret() == pw, "비밀번호는 한 번 만들어 계속 사용")
+r = asyncio.run(M.calendar_feed(Req()))
+check(r.status_code == 401 and "Basic" in r.headers.get("www-authenticate", ""), "인증 없으면 401 + Basic 요청(Remote calendar 가 아이디·비밀번호를 물음)")
+r = asyncio.run(M.calendar_feed(Req({"Authorization": basic("dhlotto", "nope")})))
+check(r.status_code == 401, "틀린 비밀번호 401")
+r = asyncio.run(M.calendar_feed(Req({"Authorization": basic("dhlotto", pw)}, host="172.30.32.1")))
+body = r.body.decode("utf-8")
+check(r.status_code == 200 and body.startswith("BEGIN:VCALENDAR") and "sampleid" not in body, "HA(인그레스 밖)에서 비밀번호로 가져가기")
+check("content-disposition" not in {k.lower() for k in r.headers.keys()}, "구독용은 첨부 파일이 아님")
+info = M._calendar_feed_info()
+check(info["url"].endswith(":60099/calendar.ics") and info["username"] == "dhlotto" and info["password"] == pw and info["last_fetch"], "연결 정보·마지막으로 가져간 시각")
+_orig_csrf, _orig_host = M._require_csrf, M._client_host
+M._require_csrf = lambda req: None
+M._client_host = lambda req: "172.30.32.2"
+new = asyncio.run(M.api_calendar_feed_rotate(Req()))
+newpw = json.loads(new.body)["password"]
+check(newpw != pw and json.loads(new.body)["last_fetch"] is None, "비밀번호 새로 만들기 → 연결 상태 초기화")
+check(asyncio.run(M.calendar_feed(Req({"Authorization": basic("dhlotto", pw)}))).status_code == 401, "옛 비밀번호는 거부")
+M._client_host = lambda req: "203.0.113.9"
+try:
+    asyncio.run(M.api_calendar_feed(Req(host="203.0.113.9")))
+    check(False, "연결 정보는 인그레스에서만")
+except M.HTTPException as e:
+    check(e.status_code == 403, "연결 정보(비밀번호)는 인그레스에서만")
+M._require_csrf, M._client_host = _orig_csrf, _orig_host
+src_main = open(os.path.join(HERE, "..", "app", "main.py"), encoding="utf-8").read()
+check(src_main.count("_spawn(_nudge_ha_calendar())") == 2, "정기 구매 변경·새 당첨 때 HA 캘린더 바로 갱신")
+page = open(os.path.join(HERE, "..", "app", "dashboard_page.py"), encoding="utf-8").read()
+check("budget-edit" in page and "budgetSave" in page, "럭키 랩 카드에서 바로 월 예산 입력")
+check("inHaApp" in page and "icsInApp" in page, "HA 앱 안이면 웹 브라우저로 받으라고 안내")
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

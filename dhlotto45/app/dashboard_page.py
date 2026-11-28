@@ -171,6 +171,13 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 .claim { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; background: var(--chip); margin-top: 6px; font-size: 13px; }
 .claim.visit { border-left: 4px solid var(--lose); }
 .claim .dd { font-weight: 800; white-space: nowrap; }
+.cred { margin-top: 8px; }
+.cred > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.cred > div { display: flex; gap: 6px; align-items: center; }
+.cred input { flex: 1 1 auto; min-width: 0; font-size: 16px; color: var(--ink); }
+.budget-edit { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.budget-edit input { flex: 1 1 auto; min-width: 0; font-size: 16px; }
+.okline { color: var(--win); font-weight: 700; font-size: 13px; margin-top: 6px; }
 .rows { display: flex; flex-direction: column; gap: 8px; }
 .row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--chip); min-width: 0; border: 1px solid transparent; }
 .compact .row { padding: 6px 8px; }
@@ -212,7 +219,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 .btn.lucky { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: var(--accent-ink); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .manual { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
-.manual input, .manual select, .field input, .field select { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+.manual input, .manual select, .field input, .field select, .cred input, .budget-edit input { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; }
 .manual input.lotto { flex: 1 1 200px; }
 .manual input.pnum { width: 120px; letter-spacing: .12em; }
 .preview { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
@@ -482,25 +489,40 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       luckDetail: "추첨 끝난 로또 {g}게임·연금 {p}매 · 확률상 기대 당첨 {e}회 · 실제 {w}회 · 환급률 {r}%",
       luckJackpot: "지금 속도(주 {n}게임)라면 로또 1등 기대 시점은 약 {y}년 뒤입니다 (1등 확률 1/8,145,060).",
       luckNote: "운 지수 = 산 복권 수로 기대되는 당첨 횟수와 실제 당첨 횟수를 비교한 백분위(이항분포 정확 계산). 재미로 보는 통계이며 다음 추첨 확률은 바뀌지 않습니다.",
-      budgetTitle: "이번 달 예산", budgetOff: "월 예산이 꺼져 있습니다 — ⏰ 설정에서 계정별 월 예산을 정하면 넘는 구매를 자동으로 막아 줍니다.",
+      budgetTitle: "이번 달 예산", budgetOff: "월 예산이 꺼져 있습니다. 아래 칸에 금액을 넣고 저장하면 계정마다 한 달에 그 금액까지만 살 수 있고, 넘는 구매는 자동으로 막힙니다.",
+      budgetPh: "예: 20000 (0 = 끄기)", budgetSave: "저장", budgetSaved: "월 예산을 저장했습니다.", budgetWhere: "같은 설정이 ⏰ 자동 구매·알림 카드에도 있습니다. 모든 계정에 같은 금액이 계정마다 따로 적용됩니다.",
+      calTitle: "캘린더", calHaT: "HA 캘린더에 자동 표시 (추천)",
+      calHaHint: "한 번 연결해 두면 로또 판매 마감·연금 추첨·정기 자동 구매·당첨금 지급기한이 HA 캘린더(사이드바 '캘린더')에 자동으로 나타나고, 하루 한 번 알아서 새로 가져옵니다. 정기 구매를 바꾸거나 새로 당첨되면 바로 갱신합니다. 캘린더 일정으로 자동화도 만들 수 있습니다.",
+      calStatusOk: "✅ 연결됨 · HA가 마지막으로 가져간 시각: ", calStatusNo: "아직 연결되지 않았습니다 — 아래 '연결 방법'을 따라 한 번만 설정하세요.",
+      calFold: "🔗 HA 캘린더 연결 방법 (1분)",
+      calStep1: "① HA 설정 → 기기 및 서비스 → 오른쪽 아래 '통합 구성요소 추가' → 'Remote calendar'(원격 캘린더) 검색.",
+      calStep2: "② 캘린더 이름: DH Lotto 45 · 캘린더 URL: 아래 주소를 붙여넣기 · 'SSL 인증서 확인'은 꺼도 됩니다(HA 내부 주소라 http).",
+      calStep3: "③ 사용자 이름·비밀번호를 물으면 아래 값을 붙여넣고 완료.",
+      calStep4: "④ 사이드바 '캘린더'에서 DH Lotto 45 가 켜져 있는지 확인하세요. 위 상태가 '연결됨'으로 바뀌면 성공입니다.",
+      calUrl: "캘린더 URL", calUser: "사용자 이름", calPass: "비밀번호", calCopy: "복사", calCopied: "복사했습니다.", calCopyFail: "복사하지 못했습니다. 칸을 길게 눌러 직접 복사하세요.",
+      calRotate: "비밀번호 새로 만들기", calRotateTitle: "캘린더 비밀번호 새로 만들기", calRotateConfirm: "새 비밀번호를 만들면 HA의 Remote calendar 통합에도 새 비밀번호를 다시 넣어야 합니다. 비밀번호가 다른 사람에게 알려졌을 때만 쓰세요.",
+      calRotated: "새 비밀번호를 만들었습니다. HA의 Remote calendar 통합에서 비밀번호를 바꿔 주세요.",
+      calNote: "이 주소는 HA 내부에서만 쓰는 주소이고 비밀번호로 보호됩니다. 구글·아이폰 기본 캘린더는 바깥에서 이 주소에 접속할 수 없어 구독이 안 됩니다 — 휴대폰 기본 캘린더에 넣으려면 아래 '파일로 넣기'를 쓰세요.",
+      calFileT: "휴대폰 기본 캘린더에 파일로 넣기",
+      icsInApp: "⚠️ 지금 HA 앱 안에서 보고 있습니다. 파일 받기는 휴대폰·PC의 웹 브라우저(크롬·사파리)로 HA 주소에 접속한 뒤 이 화면에서 누르세요.",
       budgetUsed: "사용", budgetLeft: "남음", budgetOver: "예산을 다 썼습니다 — 이번 달 추가 구매는 막힙니다.",
       claimTitle: "당첨금 수령 도우미", claimNone: "직접 수령해야 할 당첨이 없습니다 (200만원 이하 인터넷 당첨금은 예치금으로 자동 지급).",
       claimVisit: "지급기한은 추첨일로부터 1년이며, 그날이 은행 휴무일(주말·공휴일)이면 다음 영업일까지입니다. 화면의 날짜는 주말만 반영했으니 공휴일과 겹치면 하루 이상 늘어납니다. 기한이 지나면 당첨금은 복권기금으로 귀속됩니다. (출처: 동행복권 이용안내·당첨자 가이드)",
       how_auto: "예치금 자동 지급", how_bank_branch: "🏦 농협은행 지점 방문 · 신분증·당첨 복권 번호", how_bank_hq: "🏦 농협은행 본점 방문 · 신분증·당첨 복권 번호",
       how_pension_office: "🏢 (주)동행복권 본사 방문 · 신분증 → 청구한 다음 달부터 매월 20일 지급",
       claimAuto: "예치금 자동 지급", claimExpired: "기한 지남", icsBtn: "📅 캘린더 받기 (.ics)",
-      icsHint: "휴대폰 캘린더에 '로또 마감 2시간 전'·'당첨금 지급기한' 알림을 넣어 주는 파일입니다. 필요한지 모르겠다면 아래 안내를 펼쳐 보세요.",
+      icsHint: "휴대폰 기본 캘린더(구글·아이폰·삼성)에 '로또 마감 2시간 전'·'당첨금 지급기한' 알림을 넣는 파일입니다. HA 캘린더 연결과 달리 저절로 갱신되지 않습니다.",
       icsFold: "❓ 캘린더 받기는 언제 쓰나요? · 사용 방법",
       icsWhyT: "이런 분께 좋아요",
       icsWhy1: "• HA 알림을 안 쓰거나, 집 밖·HA가 꺼져 있을 때도 휴대폰 자체 알림으로 받고 싶은 분 — 일정과 알림이 휴대폰에 저장되어 HA·인터넷이 없어도 울립니다.",
       icsWhy2: "• 가족 공유 캘린더에 넣어 다른 가족도 마감·추첨·지급기한을 보게 하고 싶은 분.",
       icsWhy3: "• 고액 당첨이 있을 때 지급기한(1년)을 놓치지 않도록 30일·7일·1일 전 알림을 휴대폰에 확실히 남겨 두고 싶은 분.",
       icsSkipT: "안 써도 되는 경우",
-      icsSkip: "⏰ 설정의 마감 알림·당첨금 수령 기한 알림·주간 리포트를 HA 앱(또는 카카오톡)으로 받고 있다면 내용이 거의 같으니 받지 않아도 됩니다.",
+      icsSkip: "위의 HA 캘린더 자동 표시를 연결했고, ⏰ 설정의 마감 알림·당첨금 수령 기한 알림·주간 리포트를 HA 앱(또는 카카오톡)으로 받고 있다면 내용이 거의 같으니 받지 않아도 됩니다.",
       icsWhatT: "파일에 들어가는 일정",
       icsWhat: "앞으로 8주 로또 판매 마감(토 20:00, 2시간 전 알림)·연금복권 추첨(목 19:05), 켜 둔 정기 자동 구매 일정(매주 반복), 직접 받아야 하는 당첨금의 지급기한(30·7·1일 전 알림).",
       icsHowT: "사용 방법",
-      icsHow1: "① 위 '캘린더 받기' 버튼을 누르면 dhlotto45.ics 파일이 내려받아집니다. (HA 앱 안에서 저장이 안 되면 휴대폰·PC 웹 브라우저로 HA에 접속해 받으세요.)",
+      icsHow1: "① HA 앱이 아니라 휴대폰·PC의 웹 브라우저(크롬·사파리)로 HA 주소에 접속해 이 카드를 연 뒤 '캘린더 받기'를 누르세요. dhlotto45.ics 파일이 저장됩니다. (HA 앱 안에서는 파일 저장이 안 될 수 있습니다.)",
       icsHow2: "② 아이폰: 파일 앱에서 dhlotto45.ics 를 눌러 '모두 추가' → 넣을 캘린더 선택.",
       icsHow3: "③ 안드로이드(구글 캘린더): PC에서 calendar.google.com → 설정 ⚙️ → 가져오기 및 내보내기 → 파일 선택 → 캘린더 선택 → 가져오기. 휴대폰 구글 캘린더에 자동으로 나타납니다.",
       icsHow4: "④ 삼성 캘린더: 내 파일에서 dhlotto45.ics 를 눌러 삼성 캘린더로 열고 저장.",
@@ -572,14 +594,29 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       luckDetail: "Drawn: {g} lotto games · {p} pension tickets · expected wins {e} · actual {w} · return {r}%",
       luckJackpot: "At your pace ({n} games a week) a lotto jackpot is expected in about {y} years (odds 1 in 8,145,060).",
       luckNote: "Luck index = percentile of your actual wins against the wins expected from the tickets you bought (exact binomial). Just for fun: it never changes the odds of the next draw.",
-      budgetTitle: "This month's budget", budgetOff: "No monthly budget — set one per account in ⏰ settings and purchases over it are blocked automatically.",
+      budgetTitle: "This month's budget", budgetOff: "No monthly budget. Enter an amount below and save: each account can then spend up to that amount per month, and purchases over it are blocked.",
+      budgetPh: "e.g. 20000 (0 = off)", budgetSave: "Save", budgetSaved: "Monthly budget saved.", budgetWhere: "The same setting is in the ⏰ card. The amount applies to each account separately.",
+      calTitle: "Calendar", calHaT: "Show in the HA calendar automatically (recommended)",
+      calHaHint: "Connect once and lotto cut-offs, pension draws, scheduled purchases and prize claim deadlines appear in the HA calendar (sidebar 'Calendar'), refreshed daily and right after schedule changes or new wins. You can also build automations from the events.",
+      calStatusOk: "✅ Connected · last fetched by HA: ", calStatusNo: "Not connected yet — follow 'How to connect' below once.",
+      calFold: "🔗 How to connect the HA calendar (1 min)",
+      calStep1: "① HA Settings → Devices & services → 'Add integration' → search 'Remote calendar'.",
+      calStep2: "② Calendar name: DH Lotto 45 · Calendar URL: paste the address below · 'Verify SSL' may be off (internal http address).",
+      calStep3: "③ When asked for a username and password, paste the values below and finish.",
+      calStep4: "④ Make sure DH Lotto 45 is ticked in the sidebar 'Calendar'. The status above turns 'Connected' when it works.",
+      calUrl: "Calendar URL", calUser: "Username", calPass: "Password", calCopy: "Copy", calCopied: "Copied.", calCopyFail: "Could not copy. Long-press the field and copy it yourself.",
+      calRotate: "New password", calRotateTitle: "Create a new calendar password", calRotateConfirm: "After this you must enter the new password in HA's Remote calendar integration too. Only do this if the password leaked.",
+      calRotated: "New password created. Update it in HA's Remote calendar integration.",
+      calNote: "This address only works inside HA and is password-protected. Google or iPhone calendars cannot reach it from outside, so they cannot subscribe — use 'Add as a file' below for your phone's own calendar.",
+      calFileT: "Add to your phone's own calendar as a file",
+      icsInApp: "⚠️ You are in the HA app. To download the file, open your HA address in a phone or PC web browser (Chrome, Safari) and press the button there.",
       budgetUsed: "Used", budgetLeft: "Left", budgetOver: "Budget used up — more purchases this month are blocked.",
       claimTitle: "Prize claim helper", claimNone: "No prizes to claim in person (online prizes up to 2,000,000 won are credited to your deposit).",
       claimVisit: "The claim deadline is one year from the draw date; if that day is not a bank business day it moves to the next one. Dates here skip weekends only, so a public holiday can push them later. Unclaimed prizes go to the Lottery Fund. (Source: DH Lottery user guide and winner guide)",
       how_auto: "Credited to deposit", how_bank_branch: "🏦 Any NH Bank branch · ID and ticket number", how_bank_hq: "🏦 NH Bank head office only · ID and ticket number",
       how_pension_office: "🏢 Visit the DH Lottery head office with your ID → paid on the 20th of each month from the month after you claim",
       claimAuto: "Credited to deposit", claimExpired: "Expired", icsBtn: "📅 Download calendar (.ics)",
-      icsHint: "A file that puts 'lotto cut-off in 2 hours' and 'prize claim deadline' reminders into your phone calendar. Not sure you need it? Open the guide below.",
+      icsHint: "A file that puts 'lotto cut-off in 2 hours' and 'prize claim deadline' reminders into your phone's own calendar (Google, iPhone, Samsung). Unlike the HA calendar it does not update by itself.",
       icsFold: "❓ When is the calendar useful? · How to use it",
       icsWhyT: "Good for you if",
       icsWhy1: "• You don't use HA notifications, or want reminders from the phone itself even when you're away or HA is down — the events and alarms live on the phone.",
@@ -590,7 +627,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       icsWhatT: "What the file contains",
       icsWhat: "Next 8 weeks of lotto sales cut-offs (Sat 20:00, alarm 2 h before) and pension draws (Thu 19:05), your enabled schedules (repeating weekly), and claim deadlines for prizes you must claim yourself (alarms 30, 7 and 1 day before).",
       icsHowT: "How to use",
-      icsHow1: "① Tap 'Download calendar' above to save dhlotto45.ics. (If saving doesn't work inside the HA app, open HA in your phone or PC web browser and download it there.)",
+      icsHow1: "① Open your HA address in a phone or PC web browser (Chrome, Safari) — not the HA app — and press 'Download calendar' on this card to save dhlotto45.ics. (Saving may not work inside the HA app.)",
       icsHow2: "② iPhone: open dhlotto45.ics in the Files app → 'Add All' → pick a calendar.",
       icsHow3: "③ Android (Google Calendar): on a PC go to calendar.google.com → Settings ⚙️ → Import & export → choose the file → pick a calendar → Import. It then shows on your phone.",
       icsHow4: "④ Samsung Calendar: tap dhlotto45.ics in My Files, open it with Samsung Calendar and save.",
@@ -651,7 +688,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   var data = null, current = null, timer = null, saveTimer = null, saveState = "";
   var settings = null, stats = null, statsScope = "all", modalOk = null;
   var numStats = null, numStatsAt = 0, numStatsErr = "", nsRounds = 50, nsView = "freq";
-  var insights = null, insightScope = "acc";
+  var insights = null, insightScope = "acc", calFeed = null;
+  var inHaApp = /Home ?Assistant\//i.test(navigator.userAgent || "");
   var gen = { mode: "random", odd: false, sum: false, seq: false };
   var autoDraft = { action: "lotto_auto_1", time: "09:00", days: [5], account: "all" };
   var luckyIdx = Math.floor(Math.random() * 5);
@@ -1329,6 +1367,12 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
         body.push(gauge(bd.pct, null, over));
         if (over) body.push(h("div", { cls: "hint", text: t("budgetOver") }));
       }
+      var bin = h("input", { type: "text", inputmode: "numeric", value: insights.budget_monthly ? String(insights.budget_monthly) : "", placeholder: t("budgetPh"), "aria-label": t("nBudget") });
+      body.push(h("div", { cls: "budget-edit" }, [bin, h("button", { cls: "btn small", type: "button", text: t("budgetSave"), onclick: function () {
+        var v = Number(String(bin.value).replace(/[^0-9]/g, "")) || 0;
+        saveSettings({ budget: { monthly: v } }, function (ok) { if (ok) { toast(t("budgetSaved"), "ok"); loadInsights().then(render); } });
+      } })]));
+      body.push(h("div", { cls: "hint", text: t("budgetWhere") }));
     }
     body.push(h("div", { cls: "sect", text: "💰 " + t("claimTitle") }));
     var cl = (insights.claims || []).filter(function (x) { return (insightScope === "all" || x.acct === acc.id) && x.days_left >= -30; });
@@ -1341,7 +1385,28 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       if (x.action !== "auto" && x.how) body.push(h("div", { cls: "hint", text: t("how_" + x.how) }));
     });
     if (visit.length) body.push(h("div", { cls: "hint mt8", text: t("claimVisit") }));
-    body.push(h("div", { cls: "btns tight mt10" }, [h("button", { cls: "btn secondary small", type: "button", text: t("icsBtn"), onclick: function () { download("api/calendar.ics"); } })]));
+    body.push(h("div", { cls: "sect", text: "📅 " + t("calHaT") }));
+    body.push(h("div", { cls: "hint", text: t("calHaHint") }));
+    if (calFeed) {
+      body.push(calFeed.last_fetch ? h("div", { cls: "okline", text: t("calStatusOk") + fmtTime(calFeed.last_fetch * 1000) })
+        : h("div", { cls: "hint", text: t("calStatusNo") }));
+      var calStart = body.length;
+      ["calStep1", "calStep2", "calStep3", "calStep4"].forEach(function (k) { body.push(h("div", { cls: "hint", text: t(k) })); });
+      [["calUrl", calFeed.url], ["calUser", calFeed.username], ["calPass", calFeed.password]].forEach(function (r) {
+        var inp = h("input", { type: "text", readonly: "readonly", value: r[1], "aria-label": t(r[0]), onfocus: function (e) { e.target.select(); } });
+        body.push(h("div", { cls: "cred" }, [h("span", { text: t(r[0]) }), h("div", null, [inp, h("button", { cls: "btn secondary small", type: "button", text: t("calCopy"), onclick: function () { copyText(inp); } })])]));
+      });
+      body.push(h("div", { cls: "btns tight mt8" }, [h("button", { cls: "btn secondary small", type: "button", text: t("calRotate"), onclick: function () {
+        openModal(t("calRotateTitle"), [t("calRotateConfirm")], t("calRotate"), function () {
+          postJson("api/calendar/feed/rotate", {}).then(function (j) { calFeed = j; toast(t("calRotated"), "ok"); render(); }).catch(function (e) { toast(e.message, "err"); });
+        });
+      } })]));
+      body.push(h("div", { cls: "hint", text: t("calNote") }));
+      foldTail(body, calStart, "cal-connect", t("calFold"));
+    }
+    body.push(h("div", { cls: "sect", text: "📲 " + t("calFileT") }));
+    if (inHaApp) body.push(h("div", { cls: "notice warn", text: t("icsInApp") }));
+    body.push(h("div", { cls: "btns tight mt8" }, [h("button", { cls: "btn secondary small", type: "button", text: t("icsBtn"), onclick: function () { download("api/calendar.ics"); } })]));
     body.push(h("div", { cls: "hint", text: t("icsHint") }));
     var icsStart = body.length;
     [["icsWhyT", ["icsWhy1", "icsWhy2", "icsWhy3"]], ["icsSkipT", ["icsSkip"]], ["icsWhatT", ["icsWhat"]],
@@ -1353,7 +1418,21 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     body.push(h("div", { cls: "hint mt8", text: t("luckNote") }));
     return card("insight", "🧠", t("insight"), lk.top_pct ? t("luckTop") + " " + lk.top_pct + "%" : "", body);
   }
-  function loadInsights() { return getJson("api/insights").then(function (j) { insights = j; }).catch(function () {}); }
+  function loadInsights() {
+    return Promise.all([
+      getJson("api/insights").then(function (j) { insights = j; }).catch(function () {}),
+      getJson("api/calendar/feed").then(function (j) { calFeed = j; }).catch(function () {})]);
+  }
+  function copyText(inp) {
+    var done = function () { toast(t("calCopied"), "ok"); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(inp.value).then(done).catch(function () { legacyCopy(inp, done); });
+    } else legacyCopy(inp, done);
+  }
+  function legacyCopy(inp, done) {
+    try { inp.focus(); inp.select(); if (document.execCommand("copy")) { done(); return; } } catch (e) { /* fall through */ }
+    toast(t("calCopyFail"), "err");
+  }
 
   // ------------------------------------------------------------ auto-buy & notifications
   function dayNames() { return t("dayNames").split(","); }

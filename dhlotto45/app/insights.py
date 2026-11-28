@@ -13,7 +13,9 @@ insights.py (v2.12.0)
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import math
 import re
 from datetime import date, datetime, timedelta, timezone
@@ -470,6 +472,23 @@ def household_payloads(items, labels: dict, today: date) -> list:
         out.append({"amount": g["amount"], "kind": "expense" if kind == "buy" else "income",
                     "merchant": "동행복권", "category": "복권", "memo": memo[:120], "account": label})
     return out
+
+
+# ---------------------------------------------------------------- calendar feed auth
+def basic_auth_ok(header, user: str, password: str) -> bool:
+    """HTTP Basic 인증 헤더 검사(시간 일정 비교). HA Remote calendar 통합이 이 방식으로 접속한다."""
+    if not header or not password or not str(header).startswith("Basic "):
+        return False
+    try:
+        raw = base64.b64decode(str(header)[6:].strip(), validate=True).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return False
+    u, sep, p = raw.partition(":")
+    if not sep:
+        return False
+    ok_user = hmac.compare_digest(u.encode("utf-8"), user.encode("utf-8"))
+    ok_pass = hmac.compare_digest(p.encode("utf-8"), password.encode("utf-8"))
+    return ok_user and ok_pass
 
 
 # ---------------------------------------------------------------- calendar (.ics)

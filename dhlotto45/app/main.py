@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.12.2
+Lotto 45 Add-on Main Application v2.13.0
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -117,7 +117,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.12.2"
+APP_VERSION = "2.13.0"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -2691,22 +2691,99 @@ async def api_household_status(request: Request):
     return JSONResponse({"available": await _household_available()}, headers=_SECURITY_HEADERS)
 
 
+def _calendar_body() -> str:
+    now = FT.now_kst()
+    settings = _load_settings()
+    sched = settings["auto_buy"]["schedules"] if settings["auto_buy"]["enabled"] else []
+    return IN.build_ics(now.date(), now, lotto=bool(config["enable_lotto645"]),
+                        pension=bool(config.get("enable_pension720", True)), schedules=sched,
+                        action_labels={a: action_label(a)[0] for a in FT.SCHED_ACTIONS}, labels=_labels(),
+                        claim_list=IN.claims(_get_ledger().entries, now.date()))
+
+
 @app.get("/api/calendar.ics")
 async def api_calendar(request: Request):
     """추첨·판매 마감·정기 자동 구매·당첨금 수령 기한 캘린더(.ics) 내려받기."""
     _require_ingress(request)
     from fastapi.responses import Response
-    now = FT.now_kst()
-    settings = _load_settings()
-    sched = settings["auto_buy"]["schedules"] if settings["auto_buy"]["enabled"] else []
-    labels = _labels()
-    body = IN.build_ics(now.date(), now, lotto=bool(config["enable_lotto645"]),
-                        pension=bool(config.get("enable_pension720", True)), schedules=sched,
-                        action_labels={a: action_label(a)[0] for a in FT.SCHED_ACTIONS}, labels=labels,
-                        claim_list=IN.claims(_get_ledger().entries, now.date()))
     headers = dict(_SECURITY_HEADERS)
     headers["Content-Disposition"] = 'attachment; filename="dhlotto45.ics"'
-    return Response(content=body, media_type="text/calendar; charset=utf-8", headers=headers)
+    return Response(content=_calendar_body(), media_type="text/calendar; charset=utf-8", headers=headers)
+
+
+CALENDAR_USER = "dhlotto"
+_calendar_fetch = {"at": 0.0}
+
+
+def _calendar_secret(rotate: bool = False) -> str:
+    """HA Remote calendar 가 쓰는 캘린더 주소 비밀번호(/data 에 보관, 처음 쓸 때 만든다)."""
+    st = _state()
+    s = st.get("calendar_secret")
+    if rotate or not isinstance(s, str) or len(s) < 20:
+        s = secrets.token_urlsafe(18)
+        st["calendar_secret"] = s
+        _save_state()
+    return s
+
+
+@app.get("/calendar.ics")
+async def calendar_feed(request: Request):
+    """HA Remote calendar 통합용 구독 주소(Basic 인증). HA 가 하루 한 번 가져가 캘린더에 표시한다."""
+    from fastapi.responses import Response
+    if not IN.basic_auth_ok(request.headers.get("Authorization"), CALENDAR_USER, _calendar_secret()):
+        headers = dict(_SECURITY_HEADERS)
+        headers["WWW-Authenticate"] = 'Basic realm="DH Lotto 45"'
+        return Response(status_code=401, content="authentication required", headers=headers)
+    _calendar_fetch["at"] = time.time()
+    st = _state()
+    st["calendar_fetch_at"] = int(_calendar_fetch["at"])
+    _save_state()
+    return Response(content=_calendar_body(), media_type="text/calendar; charset=utf-8", headers=_SECURITY_HEADERS)
+
+
+def _calendar_feed_info() -> dict:
+    import socket
+    last = _calendar_fetch["at"] or float(_state().get("calendar_fetch_at") or 0)
+    return {"url": f"http://{socket.gethostname()}:60099/calendar.ics", "username": CALENDAR_USER,
+            "password": _calendar_secret(), "last_fetch": int(last) or None}
+
+
+@app.get("/api/calendar/feed")
+async def api_calendar_feed(request: Request):
+    """HA 캘린더 연결 정보(주소·아이디·비밀번호·마지막으로 가져간 시각). Ingress 전용."""
+    _require_ingress(request)
+    return JSONResponse(_calendar_feed_info(), headers=_SECURITY_HEADERS)
+
+
+@app.post("/api/calendar/feed/rotate")
+async def api_calendar_feed_rotate(request: Request):
+    """캘린더 주소 비밀번호 새로 만들기. Ingress + CSRF."""
+    _require_ingress(request)
+    _require_csrf(request)
+    _calendar_secret(rotate=True)
+    _calendar_fetch["at"] = 0.0
+    st = _state()
+    st.pop("calendar_fetch_at", None)
+    _save_state()
+    logger.warning("[CALENDAR] 캘린더 주소 비밀번호를 새로 만들었습니다(HA Remote calendar 비밀번호도 바꿔야 함)")
+    return JSONResponse(_calendar_feed_info(), headers=_SECURITY_HEADERS)
+
+
+_calendar_nudge_at = -1e9
+
+
+async def _nudge_ha_calendar() -> None:
+    """HA 에 연결된 DH Lotto 캘린더를 바로 새로 가져오게 한다(정기 구매 일정 변경·새 당첨 직후)."""
+    global _calendar_nudge_at
+    if time.monotonic() - _calendar_nudge_at < 60 or not _calendar_fetch["at"] and not _state().get("calendar_fetch_at"):
+        return
+    _calendar_nudge_at = time.monotonic()
+    states = await _ha_get("states")
+    ids = [s.get("entity_id") for s in states or [] if isinstance(s, dict)
+           and str(s.get("entity_id", "")).startswith("calendar.")
+           and "dh lotto" in str((s.get("attributes") or {}).get("friendly_name", "")).lower()]
+    if ids:
+        await _ha_post("services/homeassistant/update_entity", {"entity_id": ids})
 
 
 # ================================================================ v2.7.0 확장 기능
@@ -2806,6 +2883,8 @@ def _observe_sensor(account: AccountData, entity_id: str, state, attributes: dic
             for it in new_wins:
                 logger.info(f"[WIN][{label}] {it['game']} {it['round']}회 {it['info']} {it['amount']:,}원")
                 _spawn(_notify_win(label, it))
+            if new_wins:
+                _spawn(_nudge_ha_calendar())
         if entity_id == "lotto45_balance":
             _spawn(_check_low_deposit(aid, label, state))
     except Exception as e:  # noqa: BLE001
@@ -3193,6 +3272,8 @@ async def api_put_settings(request: Request):
         except OSError as e:
             logger.error(f"[FEAT] 설정 저장 실패: {e}")
             raise HTTPException(status_code=500, detail="설정을 저장하지 못했습니다.")
+    if before["auto_buy"] != settings["auto_buy"]:
+        _spawn(_nudge_ha_calendar())
     if before["auto_buy"]["enabled"] != settings["auto_buy"]["enabled"]:
         ha_user = request.headers.get("X-Remote-User-Name") or "?"
         logger.warning(f"[AUTO] 정기 자동 구매 {'켜짐' if settings['auto_buy']['enabled'] else '꺼짐'} "
