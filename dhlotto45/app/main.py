@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.11.1
+Lotto 45 Add-on Main Application v2.11.2
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -33,6 +33,7 @@ from dh_mobile_api import DhMobileApiClient, DhMobileApiError
 from dh_pension_browser import (
     DhPensionBrowser,
     DhPensionBrowserError,
+    extra_ticket_warning,
     validate_manual_selection,
 )
 from dashboard_api import (
@@ -113,7 +114,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.11.1"
+APP_VERSION = "2.11.2"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -498,7 +499,9 @@ async def execute_pension_purchase(account: AccountData, count: int):
         result = await asyncio.wait_for(
             account.pension.async_buy_auto(count), timeout=180
         )
-        pension_daily_tracker.record_purchase(username, result.get("count", count))
+        extra = result.get("extra_tickets") or []
+        # 하루 한도는 보수적으로: 화면에 더 보인 티켓까지 센다
+        pension_daily_tracker.record_purchase(username, result.get("count", count) + len(extra))
         round_label = f"{result['round']}회" if result['round'] else "최신회차"
         logger.info(
             f"[PENSION][{mask_username(username)}] Success! round {result['round']}, "
@@ -516,10 +519,13 @@ async def execute_pension_purchase(account: AccountData, count: int):
                 "icon": "mdi:cash-check",
             },
         )
-        # 성공 시 과거 오류 센서 해제
-        await publish_sensor_for_account(account, "pension720_purchase_error", "없음", {
+        # 성공 시 과거 오류 센서 해제. 요청보다 많은 티켓이 보이면 경고로 남긴다(숨기지 않음).
+        warn = extra_ticket_warning(count, extra)
+        if warn:
+            logger.error(f"[PENSION][{mask_username(username)}] {warn}")
+        await publish_sensor_for_account(account, "pension720_purchase_error", warn or "없음", {
             "friendly_name": "연금복권 구매 오류",
-            "icon": "mdi:cart-check",
+            "icon": "mdi:alert" if warn else "mdi:cart-check",
         })
         await _refresh_pension_history_after_purchase(account)
     except asyncio.TimeoutError:
@@ -653,7 +659,8 @@ async def execute_pension_manual_purchase(account: AccountData):
         result = await asyncio.wait_for(
             account.pension.async_buy_manual(group, digits), timeout=180
         )
-        pension_daily_tracker.record_purchase(username, result.get("count", 1))
+        extra = result.get("extra_tickets") or []
+        pension_daily_tracker.record_purchase(username, result.get("count", 1) + len(extra))
         round_label = f"{result['round']}회" if result['round'] else "최신회차"
         logger.info(f"[PENSION][{mask_username(username)}] Manual success! {result['numbers']}")
         await publish_sensor_for_account(
@@ -669,9 +676,12 @@ async def execute_pension_manual_purchase(account: AccountData):
                 "icon": "mdi:cash-check",
             },
         )
-        await publish_sensor_for_account(account, "pension720_purchase_error", "없음", {
+        warn = extra_ticket_warning(1, extra)
+        if warn:
+            logger.error(f"[PENSION][{mask_username(username)}] {warn}")
+        await publish_sensor_for_account(account, "pension720_purchase_error", warn or "없음", {
             "friendly_name": "연금복권 구매 오류",
-            "icon": "mdi:cart-check",
+            "icon": "mdi:alert" if warn else "mdi:cart-check",
         })
         await _refresh_pension_history_after_purchase(account)
     except asyncio.TimeoutError:

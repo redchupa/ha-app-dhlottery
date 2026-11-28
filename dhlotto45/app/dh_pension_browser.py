@@ -55,6 +55,9 @@ LOGIN_BTN_SELECTORS = (
 )
 
 PENSION_PRICE = 1000  # 1매 1,000원
+# 번호확정(doVerify) 응답 대기. doVerify 는 번호를 장바구니에 담으므로 절대 다시 부르지 않는다
+# (늦다고 재호출하면 같은 줄이 두 번 담겨 2매가 결제될 수 있음 — v2.11.2 제보).
+VERIFY_WAIT = 40.0
 MAX_COUNT = 5
 
 # 동행복권 로그인 페이지의 비밀번호 입력란은 maxlength="20" 이다. 브라우저 입력은
@@ -108,6 +111,25 @@ RSA_READY_JS = "(() => typeof rsa !== 'undefined' && !!rsa && rsa.n != null)()"
 BROWSER_CONNECT_INTERVAL = 0.5
 BROWSER_CONNECT_MAX_TRIES = 60
 BROWSER_START_ATTEMPTS = 2
+
+
+def verify_timeout_message(label: str) -> str:
+    """번호확정 응답이 늦어 결제 전에 멈췄을 때 사용자에게 보여 줄 문구."""
+    return (
+        f"{label} 번호확정 응답이 {VERIFY_WAIT:.0f}초 안에 오지 않아 구매하지 않았습니다 "
+        "(결제 전 중단, 지출 없음 · 같은 번호가 두 번 담기는 것을 막기 위함). 잠시 후 다시 시도하세요."
+    )
+
+
+def extra_ticket_warning(requested: int, extra) -> str:
+    """구매 완료 화면에 요청보다 많은 티켓이 보일 때의 경고 문구(빈 목록이면 빈 문자열)."""
+    if not extra:
+        return ""
+    nums = ", ".join(f"{t.get('group')}조 {t.get('numbers')}" for t in extra)
+    return (
+        f"⚠️ 요청한 {requested}매 외에 {len(extra)}매가 더 보입니다({nums}). "
+        "동행복권 구매내역에서 실제 구매 매수를 꼭 확인하세요."
+    )
 
 
 def browser_connect_kwargs(zd):
@@ -442,7 +464,8 @@ class DhPensionBrowser:
     async def _do_buy(self, count: int) -> dict:
         async def work(tab):
             t0 = time.monotonic()
-            tickets = await self._purchase(tab, count)
+            all_tickets = await self._purchase(tab, count)
+            tickets, extra = all_tickets[:count], all_tickets[count:]
             round_no = await self._resolve_round()
             amount = count * PENSION_PRICE
             numbers = ", ".join(
@@ -458,6 +481,7 @@ class DhPensionBrowser:
                 "amount": amount,
                 "numbers": numbers,
                 "tickets": tickets,
+                "extra_tickets": extra,
             }
 
         return await self._session(work)
@@ -466,6 +490,7 @@ class DhPensionBrowser:
         async def work(tab):
             t0 = time.monotonic()
             ticket = await self._purchase_manual(tab, group, digits)
+            extra = ticket.pop("extra", [])
             round_no = await self._resolve_round()
             amount = PENSION_PRICE
             numbers = f"{ticket['group']}조 {ticket['numbers']}"
@@ -479,6 +504,7 @@ class DhPensionBrowser:
                 "amount": amount,
                 "numbers": numbers,
                 "tickets": [ticket],
+                "extra_tickets": extra,
             }
 
         return await self._session(work)
@@ -515,10 +541,7 @@ class DhPensionBrowser:
                 await asyncio.sleep(0.2)
                 observed = await self._set_manual_digits(tab, digits)
                 dialogs_before = len(self._dialog_msgs)
-                for _ in range(3):
-                    await self._safe_eval(tab, "doVerify()")
-                    if await self._wait_ajax_idle(tab, timeout=15.0):
-                        break
+                await self._verify_once(tab, f"[진단] {group}조")
                 await asyncio.sleep(0.8)
                 new_dialogs = [m for m in self._dialog_msgs[dialogs_before:] if m]
                 stage = (
@@ -830,7 +853,12 @@ class DhPensionBrowser:
             raise DhPensionBrowserError(
                 f"구매는 되었으나 티켓 파싱 실패(기대 {count}매, 추출 {len(tickets)}매)"
             )
-        return tickets[:count]
+        if len(tickets) > count:
+            self._log.error(
+                f"[PENSION-BR] ⚠️ 구매 완료 화면에 요청({count}매)보다 많은 {len(tickets)}매가 보입니다: "
+                + ", ".join(f"{t['group']}조 {t['numbers']}" for t in tickets)
+            )
+        return tickets
 
     async def _pick_one_line(self, tab, jo: int) -> None:
         """한 줄(한 조) 자동 선택: 팝업 열기 → 조 선택 → 자동번호 → 선택완료."""
@@ -857,20 +885,8 @@ class DhPensionBrowser:
         await self._safe_eval(tab, "doAuto()")
         await asyncio.sleep(0.5)
 
-        # doVerify() AJAX 지연 대비: 최대 3회 재요청, 매번 로딩 사라짐 대기
-        verified = False
-        for attempt in range(1, 4):
-            await self._safe_eval(tab, "doVerify()")
-            if await self._wait_ajax_idle(tab, timeout=15.0):
-                verified = True
-                break
-            self._log.warning(
-                f"[PENSION-BR] 조{jo} doVerify 응답 지연({attempt}/3) 재요청"
-            )
-        if not verified:
-            raise DhPensionBrowserError(
-                f"조{jo} 번호확정(doVerify) 응답 없음 — 서버 지연/차단 의심"
-            )
+        if not await self._verify_once(tab, f"조{jo}"):
+            raise DhPensionBrowserError(verify_timeout_message(f"조{jo}"))
         await asyncio.sleep(0.2)
 
     # ------------------------------------------------------- manual purchase
@@ -932,7 +948,13 @@ class DhPensionBrowser:
                 "동행복권 구매내역을 확인하세요.",
                 uncertain=True,
             )
-        return match
+        others = [t for t in tickets if t is not match]
+        if others:
+            self._log.error(
+                f"[PENSION-BR] ⚠️ 수동 1매 구매 완료 화면에 다른 티켓도 보입니다: "
+                + ", ".join(f"{t['group']}조 {t['numbers']}" for t in others)
+            )
+        return dict(match, extra=others)
 
     async def _pick_one_line_manual(self, tab, group: int, digits: str) -> bool:
         """팝업 열기 → 조 선택 → 6자리 수동 입력 → 표시 확인 → 번호확정.
@@ -968,15 +990,7 @@ class DhPensionBrowser:
 
         # 번호확정(doVerify): 매진/중복이면 서버가 알림으로 거부.
         dialogs_before = len(self._dialog_msgs)
-        verified = False
-        for attempt in range(1, 4):
-            await self._safe_eval(tab, "doVerify()")
-            if await self._wait_ajax_idle(tab, timeout=15.0):
-                verified = True
-                break
-            self._log.warning(
-                f"[PENSION-BR] {group}조 doVerify 응답 지연({attempt}/3) 재요청"
-            )
+        verified = await self._verify_once(tab, f"{group}조")
         await asyncio.sleep(0.5)
 
         # 매진/중복 거부는 JS 다이얼로그가 아니라 '페이지 내 모달'(선택번호 조회 결과:
@@ -1004,9 +1018,7 @@ class DhPensionBrowser:
                 + hint
             )
         if not verified:
-            raise DhPensionBrowserError(
-                f"{group}조 {digits} 번호확정(doVerify) 응답 없음 — 서버 지연/차단 의심"
-            )
+            raise DhPensionBrowserError(verify_timeout_message(f"{group}조 {digits}"))
         await asyncio.sleep(0.2)
         return True
 
@@ -1118,6 +1130,18 @@ class DhPensionBrowser:
         """
         res = await self._safe_eval(tab, js)
         return res if isinstance(res, str) else ""
+
+    async def _verify_once(self, tab, label: str) -> bool:
+        """번호확정(doVerify)을 딱 한 번 호출하고 끝날 때까지 기다린다. 늦으면 False(재호출 안 함)."""
+        await self._wait_ajax_idle(tab, timeout=10.0)  # 앞선 요청이 남아 있으면 먼저 끝나길 기다림
+        await self._safe_eval(tab, "doVerify()")
+        await asyncio.sleep(0.3)  # 로딩 표시가 나타날 시간
+        ok = await self._wait_ajax_idle(tab, timeout=VERIFY_WAIT)
+        if not ok:
+            self._log.warning(
+                f"[PENSION-BR] {label} 번호확정 응답 지연({VERIFY_WAIT:.0f}s) — 다시 부르지 않고 결제 전에 중단"
+            )
+        return ok
 
     async def _confirm_order(self, tab, count: int, dialogs_before: int) -> None:
         """doOrder 후 티켓 렌더를 기다리고, 실패면 사유를 분류해 예외를 던진다.
