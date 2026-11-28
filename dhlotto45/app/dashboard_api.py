@@ -175,3 +175,75 @@ class AliasLogFilter(logging.Filter):
         if new != msg:
             record.msg, record.args = new, None
         return True
+
+
+# ---------------------------------------------------------------- dashboard prefs
+# 대시보드 개인화 설정(테마·언어·카드 표시/순서 등). /data 에 저장해 기기 간 동기화한다.
+THEMES = (
+    "system", "light", "dark", "ha-blue",                                 # 기본
+    "jackpot-gold", "clover", "lucky-red", "golden-pig", "lotto-pop",     # 행운
+    "neon-draw", "aurora", "galaxy",                                      # 밤하늘·미래
+)
+CARD_IDS = ("summary", "buy", "lotto_current", "lotto_prev", "pension_current", "pension_prev", "winning")
+LUCKY_MESSAGE_MAX = 40
+
+DEFAULT_PREFS = {
+    "theme": "system",
+    "lang": "ko",
+    "density": "comfortable",     # comfortable | compact
+    "ball_style": "glossy",       # glossy | flat
+    "effects": True,              # 당첨 축하·반짝임 애니메이션
+    "show_hero": True,            # 상단 행운 배너
+    "lucky_message": "",          # 나만의 행운 문구(비우면 기본 문구 순환)
+    "default_account": "",        # account_N (비우면 첫 계정)
+    "card_order": list(CARD_IDS),
+    "hidden_cards": [],
+}
+
+
+def _clean_text(value, limit: int) -> str:
+    """제어문자 제거 + 공백 정리 + 길이 제한(표시용 문자열)."""
+    # 줄바꿈·탭 등 공백 제어문자는 띄어쓰기로, 나머지 제어문자는 제거
+    s = "".join(" " if ch.isspace() else ch for ch in str(value or "") if ch.isprintable() or ch.isspace())
+    return " ".join(s.split())[:limit]
+
+
+def normalize_prefs(raw) -> dict:
+    """저장/응답용 설정 정규화. 알 수 없는 키는 버리고 잘못된 값은 기본값으로 바꾼다."""
+    p = raw if isinstance(raw, dict) else {}
+    out = dict(DEFAULT_PREFS)
+    out["card_order"] = list(CARD_IDS)
+    out["hidden_cards"] = []
+    if p.get("theme") in THEMES:
+        out["theme"] = p["theme"]
+    if p.get("lang") in ("ko", "en"):
+        out["lang"] = p["lang"]
+    if p.get("density") in ("comfortable", "compact"):
+        out["density"] = p["density"]
+    if p.get("ball_style") in ("glossy", "flat"):
+        out["ball_style"] = p["ball_style"]
+    for key in ("effects", "show_hero"):
+        if isinstance(p.get(key), bool):
+            out[key] = p[key]
+    out["lucky_message"] = _clean_text(p.get("lucky_message"), LUCKY_MESSAGE_MAX)
+    acc = str(p.get("default_account") or "")
+    out["default_account"] = acc if (acc.startswith("account_") and acc[8:].isdigit() and len(acc) <= 12) else ""
+    order = p.get("card_order")
+    if isinstance(order, list):
+        seen = []
+        for c in order:
+            if c in CARD_IDS and c not in seen:
+                seen.append(c)
+        out["card_order"] = seen + [c for c in CARD_IDS if c not in seen]
+    hidden = p.get("hidden_cards")
+    if isinstance(hidden, list):
+        out["hidden_cards"] = [c for c in CARD_IDS if c in hidden]
+    return out
+
+
+def merge_prefs(current, change) -> dict:
+    """현재 설정에 부분 변경을 덮어쓴 뒤 정규화."""
+    base = normalize_prefs(current)
+    if isinstance(change, dict):
+        base.update({k: v for k, v in change.items() if k in DEFAULT_PREFS})
+    return normalize_prefs(base)

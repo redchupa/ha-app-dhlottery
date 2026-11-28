@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.5.0
+Lotto 45 Add-on Main Application v2.6.0
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -46,6 +46,8 @@ from dashboard_api import (
     csrf_ok,
     is_ingress_client,
     judge_outcome,
+    merge_prefs,
+    normalize_prefs,
     normalize_lotto_manual,
     normalize_pension_manual,
     resolve_alias,
@@ -105,7 +107,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.5.0"
+APP_VERSION = "2.6.0"
 
 # Configuration variables
 config = {
@@ -1049,7 +1051,7 @@ app.add_middleware(
     # 자격증명(쿠키) 허용 안 함: 다른 사이트가 사용자의 HA 세션으로 이 API 를 부르거나
     # 응답을 읽지 못하게 한다(allow_origins="*" + credentials 는 출처를 그대로 반사해 위험).
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT"],
     allow_headers=["Content-Type"],
     expose_headers=["X-Ingress-Request"],
 )
@@ -2119,11 +2121,21 @@ _SECURITY_HEADERS = {
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     """사이드바 대시보드(구매 내역 조회 + 구매 버튼). 데이터는 api/dashboard 에서 받는다."""
+    import json as _json
     nonce = secrets.token_urlsafe(16)
+    # 직접 포트 접근에는 개인 설정을 내보내지 않는다(기본값만).
+    prefs = _load_prefs() if is_ingress_client(_client_host(request)) else normalize_prefs({})
+    # <script type=application/json> 안에 넣으므로 <, >, & 를 유니코드 이스케이프해 태그 탈출을 막는다.
+    prefs_json = (
+        _json.dumps(prefs, ensure_ascii=False)
+        .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    )
     html = (
         PAGE_TEMPLATE.replace("__NONCE__", nonce)
         .replace("__CSRF__", DASHBOARD_CSRF_TOKEN)
         .replace("__VERSION__", APP_VERSION)
+        .replace("__THEME__", prefs["theme"])  # 허용 목록 값만 저장됨
+        .replace("__PREFS_JSON__", prefs_json)
     )
     csp = (
         "default-src 'none'; "
@@ -2174,6 +2186,71 @@ async def api_dashboard(request: Request):
         },
         headers=_SECURITY_HEADERS,
     )
+
+
+DATA_DIR = os.getenv("DHL_DATA_DIR", "/data")
+PREFS_FILE = "dashboard_prefs.json"
+_PREFS_MAX_BODY = 4096
+_prefs_lock = asyncio.Lock()
+
+
+def _prefs_path() -> str:
+    return os.path.join(DATA_DIR, PREFS_FILE)
+
+
+def _load_prefs() -> dict:
+    import json as _json
+    try:
+        with open(_prefs_path(), encoding="utf-8") as f:
+            return normalize_prefs(_json.load(f))
+    except FileNotFoundError:
+        return normalize_prefs({})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[DASH] 설정 파일을 읽지 못해 기본값 사용: {e}")
+        return normalize_prefs({})
+
+
+def _save_prefs(prefs: dict) -> None:
+    """원자적 저장(임시파일 → replace)으로 쓰기 도중 꺼져도 파일이 깨지지 않게 한다."""
+    import json as _json
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = _prefs_path() + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(prefs, f, ensure_ascii=False)
+    os.replace(tmp, _prefs_path())
+
+
+@app.get("/api/prefs")
+async def api_get_prefs(request: Request):
+    """대시보드 개인화 설정(테마·언어·카드 구성). 모든 기기에서 같은 설정을 쓴다."""
+    _require_ingress(request)
+    return JSONResponse(_load_prefs(), headers=_SECURITY_HEADERS)
+
+
+@app.put("/api/prefs")
+async def api_put_prefs(request: Request):
+    """설정 부분 변경. Ingress 전용 + CSRF 헤더 필수, 값은 허용 목록으로 정규화."""
+    _require_ingress(request)
+    if not csrf_ok(DASHBOARD_CSRF_TOKEN, request.headers.get(CSRF_HEADER)):
+        raise HTTPException(status_code=403, detail="보안 토큰이 올바르지 않습니다. 페이지를 새로고침하세요.")
+    raw = await request.body()
+    if len(raw) > _PREFS_MAX_BODY:
+        raise HTTPException(status_code=413, detail="설정 데이터가 너무 큽니다.")
+    import json as _json
+    try:
+        change = _json.loads(raw or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="요청 형식이 올바르지 않습니다.")
+    if not isinstance(change, dict):
+        raise HTTPException(status_code=400, detail="요청 형식이 올바르지 않습니다.")
+    async with _prefs_lock:
+        prefs = merge_prefs(_load_prefs(), change)
+        try:
+            _save_prefs(prefs)
+        except OSError as e:
+            logger.error(f"[DASH] 설정 저장 실패: {e}")
+            raise HTTPException(status_code=500, detail="설정을 저장하지 못했습니다.")
+    return JSONResponse(prefs, headers=_SECURITY_HEADERS)
 
 
 def _sync_manual_text(username: str, text_id: str, value: str) -> None:

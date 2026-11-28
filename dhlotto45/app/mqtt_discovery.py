@@ -22,7 +22,7 @@ class MQTTDiscovery:
         """Initialize MQTT Discovery
         
         Args:
-            mqtt_url: MQTT URL (e.g., "mqtt://192.168.1.118:1883" or "homeassistant.local:1883")
+            mqtt_url: MQTT URL (e.g., "mqtt://core-mosquitto:1883" or "homeassistant.local:1883")
             username: MQTT username (optional)
             password: MQTT password (optional)
             client_id_suffix: Client ID suffix for beta version (optional)
@@ -41,7 +41,7 @@ class MQTTDiscovery:
         """Parse MQTT URL
         
         Args:
-            mqtt_url: MQTT URL (e.g., "mqtt://192.168.1.118:1883" or "homeassistant.local:1883")
+            mqtt_url: MQTT URL (e.g., "mqtt://core-mosquitto:1883" or "homeassistant.local:1883")
             
         Returns:
             tuple: (broker, port)

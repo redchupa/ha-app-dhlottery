@@ -131,5 +131,33 @@ check(H.result_style("7등 당첨")[1] == "green", "7등 초록")
 check(H.result_style("보너스 당첨")[1] == "green", "보너스 초록")
 check(H.result_style(None)[1] == "grey", "None 회색")
 
+# ------------------------------------------------ prefs
+print("[prefs]")
+dp = D.normalize_prefs({})
+check(dp["theme"] == "system" and dp["lang"] == "ko" and dp["card_order"] == list(D.CARD_IDS) and dp["hidden_cards"] == [], "기본 설정")
+check(D.normalize_prefs(None) == dp and D.normalize_prefs("x") == dp, "dict 아님 → 기본값")
+check(len(D.THEMES) == 12 and "jackpot-gold" in D.THEMES, "테마 12종")
+for th in D.THEMES:
+    check(D.normalize_prefs({"theme": th})["theme"] == th, f"테마 허용 {th}")
+for bad in ("evil", "<script>", "", None, 1, "Dark"):
+    check(D.normalize_prefs({"theme": bad})["theme"] == "system", f"테마 거부 {bad!r}")
+check(D.normalize_prefs({"lang": "en"})["lang"] == "en", "언어 en")
+check(D.normalize_prefs({"lang": "jp"})["lang"] == "ko", "언어 거부")
+check(D.normalize_prefs({"effects": "false"})["effects"] is True, "불리언 아닌 값 무시")
+check(D.normalize_prefs({"effects": False, "show_hero": False})["show_hero"] is False, "불리언 반영")
+check(D.normalize_prefs({"density": "compact", "ball_style": "flat"})["ball_style"] == "flat", "표시 옵션")
+lm = D.normalize_prefs({"lucky_message": "  1등\n\t가자!! " + "가" * 60})["lucky_message"]
+check(lm.startswith("1등 가자!!") and len(lm) == D.LUCKY_MESSAGE_MAX and "\n" not in lm, "행운 문구 정리·길이 제한")
+check(D.normalize_prefs({"lucky_message": 123})["lucky_message"] == "123", "문구 숫자 → 문자열")
+check(D.normalize_prefs({"default_account": "account_2"})["default_account"] == "account_2", "기본 계정 별칭")
+for bad in ("sampleid01", "account_", "account_x", "account_1234567", 5):
+    check(D.normalize_prefs({"default_account": bad})["default_account"] == "", f"기본 계정 거부 {bad!r}")
+o = D.normalize_prefs({"card_order": ["winning", "buy", "winning", "evil", 3]})["card_order"]
+check(o[:2] == ["winning", "buy"] and sorted(o) == sorted(D.CARD_IDS) and len(o) == len(D.CARD_IDS), "카드 순서: 중복·미지원 제거, 누락 보충")
+check(D.normalize_prefs({"hidden_cards": ["lotto_prev", "evil", "summary"]})["hidden_cards"] == ["summary", "lotto_prev"], "숨김 카드 정규화")
+m = D.merge_prefs({"theme": "clover", "lang": "en"}, {"theme": "galaxy", "unknown": 1, "rev": 9})
+check(m["theme"] == "galaxy" and m["lang"] == "en" and "unknown" not in m and "rev" not in m, "부분 병합·미지원 키 제거")
+check(D.merge_prefs({"theme": "clover"}, "bad")["theme"] == "clover", "잘못된 변경은 무시")
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)
