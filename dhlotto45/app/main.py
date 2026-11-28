@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.11.2
+Lotto 45 Add-on Main Application v2.11.3
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -109,12 +109,14 @@ class AccountData:
         self.update_task: Optional[asyncio.Task] = None
         # 구매 불가 시간대(토요일 20:00~일요일 06:00)에 이전 회차 당첨 결과 1회만 동기화
         self.prev_round_result_synced_when_unavailable: bool = False
+        # 구매 불가 시간대에도 예치금·구매 내역을 한 번은 읽어 둔다(재시작 직후 화면이 비지 않게)
+        self.closed_snapshot_done: bool = False
         # 사이드바 대시보드용: 마지막으로 발행한 센서 값 {entity_id: {state, attributes, ts}}
         self.sensor_cache: Dict[str, dict] = {}
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.11.2"
+APP_VERSION = "2.11.3"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -140,8 +142,16 @@ event_loop: Optional[asyncio.AbstractEventLoop] = None
 
 
 def install_log_alias_filter(usernames) -> None:
-    """애드온 로그에서 실제 아이디를 Account_N 별칭으로 바꾼다(로그 공유 시 아이디 노출 방지)."""
-    f = AliasLogFilter(account_aliases(usernames))
+    """애드온 로그에서 실제 아이디를 Account_N 별칭으로 바꾼다(로그 공유 시 아이디 노출 방지).
+
+    일부만 가린 표기(예: ab*****9)도 아이디 앞뒤 글자가 드러나므로 같은 별칭으로 바꾼다.
+    """
+    aliases = dict(account_aliases(usernames))
+    masks = [mask_username(u) for u in usernames or []]
+    for u, m in zip(usernames or [], masks):
+        if m != u and masks.count(m) == 1:
+            aliases[m] = aliases[u]
+    f = AliasLogFilter(aliases)
     for handler in logging.getLogger().handlers:
         for old in [x for x in handler.filters if isinstance(x, AliasLogFilter)]:
             handler.removeFilter(old)
@@ -955,6 +965,12 @@ async def init_clients():
             success_count += 1
 
     logger.info(f"Initialized {success_count}/{len(accounts)} account(s)")
+    try:
+        restored = _load_sensor_cache()
+        if restored:
+            logger.info(f"[CACHE] 지난 센서 값 {restored}개를 불러왔습니다(새로 조회되면 갱신)")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[CACHE] 지난 센서 값을 불러오지 못했습니다: {e}")
 
     # MQTT
     if config["use_mqtt"]:
@@ -980,6 +996,63 @@ async def init_clients():
             )
 
     return success_count > 0
+
+
+SENSOR_CACHE_FILE = "sensor_cache.json"
+_cache_save_task = None
+
+
+def _account_key(username: str) -> str:
+    """캐시 파일의 계정 키(실제 아이디 대신 해시)."""
+    import hashlib
+    return hashlib.sha256(username.encode("utf-8")).hexdigest()[:16]
+
+
+def _save_sensor_cache() -> None:
+    """마지막 센서 값을 /data 에 저장(재시작 직후에도 대시보드가 비지 않게)."""
+    data = {
+        _account_key(u): {k: v for k, v in a.sensor_cache.items() if k not in _DASHBOARD_EXCLUDED_SENSORS}
+        for u, a in accounts.items()
+    }
+    _write_json(SENSOR_CACHE_FILE, {"v": 1, "saved": time.time(), "accounts": data})
+
+
+def _load_sensor_cache() -> int:
+    """저장된 센서 값을 계정 캐시에 채운다. 채운 항목 수 반환."""
+    raw = _read_json(SENSOR_CACHE_FILE, {})
+    saved = raw.get("accounts") if isinstance(raw, dict) else None
+    if not isinstance(saved, dict):
+        return 0
+    n = 0
+    for u, a in accounts.items():
+        cached = saved.get(_account_key(u))
+        if not isinstance(cached, dict):
+            continue
+        for k, v in cached.items():
+            if isinstance(v, dict) and "state" in v and k not in a.sensor_cache:
+                a.sensor_cache[k] = v
+                n += 1
+    return n
+
+
+def _schedule_cache_save() -> None:
+    """센서가 바뀌면 30초 뒤 한 번 저장(잦은 디스크 쓰기 방지)."""
+    global _cache_save_task
+    if _cache_save_task is not None and not _cache_save_task.done():
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+
+    async def later():
+        await asyncio.sleep(30)
+        try:
+            _save_sensor_cache()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[CACHE] 저장 실패: {e}")
+
+    _cache_save_task = loop.create_task(later())
 
 
 def _mqtt_ready_from_thread() -> None:
@@ -1062,6 +1135,10 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("Shutting down...")
+    try:
+        _save_sensor_cache()
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"[CACHE] 종료 시 저장 실패: {e}")
     for task in tasks:
         task.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
@@ -1119,6 +1196,15 @@ async def background_tasks_for_account(account: AccountData):
             purchase_available_now = is_purchase_available_now()
             if not purchase_available_now:
                 was_purchase_available = False
+                # 연금은 이 시간에도 팔리고, 재시작 직후엔 화면이 비어 있으므로 예치금·구매 내역을 한 번 읽는다.
+                if not account.closed_snapshot_done:
+                    try:
+                        await update_sensors_for_account(account, force=True)
+                        account.closed_snapshot_done = bool(account.client and account.client.logged_in)
+                        if account.closed_snapshot_done:
+                            logger.info(f"[BG][{masked}] 구매 불가 시간 — 예치금·구매 내역을 한 번 조회했습니다(읽기 전용)")
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(f"[BG][{masked}] 구매 불가 시간 조회 실패(다음 주기에 재시도): {e}")
                 # 구매 불가 시간대: 이전 회차 당첨 결과 1회만 동기화 (추첨 후 바로 확인용)
                 if not account.prev_round_result_synced_when_unavailable:
                     try:
@@ -1134,6 +1220,7 @@ async def background_tasks_for_account(account: AccountData):
             # 구매 가능 시간대: 플래그 리셋, 전체 동기화
             if not was_purchase_available:
                 account.prev_round_result_synced_when_unavailable = False
+                account.closed_snapshot_done = False
             was_purchase_available = True
             await update_sensors_for_account(account)
             await asyncio.sleep(compute_poll_delay(config["update_interval"]))
@@ -1576,7 +1663,7 @@ async def publish_pension_history_sensors(account: AccountData):
     )
 
 
-async def update_sensors_for_account(account: AccountData):
+async def update_sensors_for_account(account: AccountData, force: bool = False):
     """계정의 센서를 갱신한다.
 
     통계·최다출현 등 로그인이 필요 없는 조회 센서는 항상 먼저 발행하고,
@@ -1590,8 +1677,8 @@ async def update_sensors_for_account(account: AccountData):
     await publish_lottery_result_sensors(account)
     await publish_pension_result_sensors(account)
 
-    # 구매 불가 시간대 체크 (최우선)
-    if not is_purchase_available_now():
+    # 구매 불가 시간대 체크 (최우선). force=True 면 읽기 전용 조회를 그대로 진행한다.
+    if not force and not is_purchase_available_now():
         now_kst = datetime.now(_TZ_KST)
         next_available = get_next_available_time()
         time_until_available = next_available - now_kst
@@ -2083,6 +2170,7 @@ async def publish_sensor_for_account(account: AccountData, entity_id: str, state
         "attributes": attributes or {},
         "ts": time.time(),
     }
+    _schedule_cache_save()
     # 원장(구매·당첨 기록)·당첨/예치금 알림
     _observe_sensor(account, entity_id, state, attributes or {})
 

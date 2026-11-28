@@ -169,5 +169,100 @@ finally:
 check(rest_called == [], "MQTT 끊김 중에는 REST 엔티티를 만들지 않음")
 check(acc.sensor_cache["lotto45_sync_status"]["state"] == "동기화 완료", "값은 캐시에 보관(재연결 때 재발행)")
 
+
+# ------------------------------------------------ v2.11.3: closed-hours snapshot, cache, masked IDs
+print("[구매 불가 시간 조회·캐시·가린 아이디]")
+M.accounts.clear()
+a1 = M.AccountData("sampleid01", "pw")
+a1.client = Logged()
+a1.sensor_cache = {"lotto45_balance": {"state": 91250, "attributes": {}, "ts": 1.0},
+                   "pension720_this_round": {"state": 5, "attributes": {"round_no": 344, "games": []}, "ts": 1.0}}
+M.accounts["sampleid01"] = a1
+M._save_sensor_cache()
+txt = open(os.path.join(os.environ["DHL_DATA_DIR"], "sensor_cache.json"), encoding="utf-8").read()
+check("sampleid01" not in txt and "91250" in txt, "캐시 파일에 실제 아이디 없음(해시 키)")
+a1.sensor_cache = {"lotto45_balance": {"state": 100, "attributes": {}, "ts": 9.0}}  # 새로 조회된 값
+n = M._load_sensor_cache()
+check(n == 1 and a1.sensor_cache["lotto45_balance"]["state"] == 100, "새 값은 덮어쓰지 않음")
+check(a1.sensor_cache["pension720_this_round"]["state"] == 5, "지난 구매 내역 복원")
+
+buf = []
+
+
+class _H(logging.Handler):
+    def emit(self, record):
+        buf.append(record.getMessage())
+
+
+root = logging.getLogger()
+h = _H()
+root.addHandler(h)
+M.install_log_alias_filter(["sampleid01", "sampleid02"])
+logging.getLogger("t_mask").warning("[DASH][%s] 구매 요청 · %s", M.mask_username("sampleid01"), "sampleid02")
+root.removeHandler(h)
+last = buf[-1] if buf else ""
+check("[DASH][Account_1]" in last and "Account_2" in last and "sa*" not in last, f"가린 아이디도 별칭으로 ({last})")
+
+calls = []
+state = {"available": False, "sleeps": 0}
+
+
+async def fake_update(account, force=False):
+    calls.append(force)
+
+
+async def fake_prev(account):
+    calls.append("prev")
+
+
+async def fake_sleep(_s):
+    state["sleeps"] += 1
+    if state["sleeps"] >= 4:
+        raise asyncio.CancelledError()
+
+
+M.update_sensors_for_account = fake_update
+M.update_prev_round_result_sensors_for_account = fake_prev
+M.is_purchase_available_now = lambda: state["available"]
+orig_sleep = M.asyncio.sleep
+M.asyncio.sleep = fake_sleep
+try:
+    a1.closed_snapshot_done = False
+    asyncio.run(M.background_tasks_for_account(a1))
+finally:
+    M.asyncio.sleep = orig_sleep
+check(calls.count(True) == 1 and calls.count("prev") == 1, f"구매 불가 시간: 읽기 전용 조회 1번 + 지난 회차 1번 ({calls})")
+check(a1.closed_snapshot_done is True, "조회 완료 표시")
+
+calls.clear()
+state["sleeps"] = 0
+a1.closed_snapshot_done = False
+
+
+async def fake_update_logout(account, force=False):
+    calls.append(force)
+    account.client.logged_in = False   # 로그인 실패 상황
+
+
+M.update_sensors_for_account = fake_update_logout
+M.asyncio.sleep = fake_sleep
+try:
+    asyncio.run(M.background_tasks_for_account(a1))
+finally:
+    M.asyncio.sleep = orig_sleep
+check(a1.closed_snapshot_done is False and calls.count(True) >= 2, f"로그인 실패면 완료로 표시하지 않고 다음 주기에 재시도 ({calls})")
+a1.client.logged_in = True
+
+calls.clear()
+state.update(available=True, sleeps=0)
+a1.closed_snapshot_done = True
+M.update_sensors_for_account = fake_update
+M.asyncio.sleep = fake_sleep
+try:
+    asyncio.run(M.background_tasks_for_account(a1))
+finally:
+    M.asyncio.sleep = orig_sleep
+check(calls and all(c is False for c in calls), f"판매 시간에는 평소 조회(강제 아님) ({calls})")
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)
