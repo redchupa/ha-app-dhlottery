@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.7.1
+Lotto 45 Add-on Main Application v2.8.0
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -113,7 +113,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.7.1"
+APP_VERSION = "2.8.0"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -1066,6 +1066,14 @@ app.add_middleware(
     allow_headers=["Content-Type"],
     expose_headers=["X-Ingress-Request"],
 )
+
+
+# 대시보드 이미지(최적화된 WebP). 상대 경로(static/…)라 Ingress 에서도 그대로 동작한다.
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+_STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+if os.path.isdir(_STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 
 def is_ingress_request(request: Request) -> bool:

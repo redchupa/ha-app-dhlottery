@@ -20,3 +20,6 @@ _backups/
 
 # 내부 유지보수/리버스 엔지니어링 메모 (공개 제외)
 dhlotto45/REVERSE_ENGINEERING.md
+
+# 디자인 원본(고해상도 PNG) — 애드온에는 최적화된 WebP만 포함
+_art_source/

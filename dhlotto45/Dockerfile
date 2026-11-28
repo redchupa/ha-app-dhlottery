@@ -36,6 +36,7 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade pip 
     && python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 COPY app/*.py ./
+COPY app/static ./static
 COPY run.sh /
 RUN chmod a+x /run.sh
 

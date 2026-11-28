@@ -128,7 +128,9 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 
 /* ================================================================ hero */
 .hero { position: relative; overflow: hidden; border-radius: calc(var(--radius) + 6px); background: var(--hero); color: var(--hero-ink);
-  padding: 22px 24px; margin-bottom: var(--gap); display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; align-items: center; }
+  padding: 22px 24px; margin-bottom: var(--gap); display: grid; grid-template-columns: 1.1fr 1fr auto; gap: 18px; align-items: center; }
+.hero-art { width: 190px; height: auto; margin: -14px -8px -22px 0; filter: drop-shadow(0 10px 18px rgba(0,0,0,.28)); }
+.logo-img { width: 34px; height: 34px; display: block; filter: drop-shadow(0 2px 4px rgba(0,0,0,.2)); }
 .hero[hidden] { display: none; }
 .hero::before { content: ""; position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(circle at 85% -10%, rgba(255,255,255,.35), transparent 45%), radial-gradient(circle at 0% 120%, rgba(255,255,255,.18), transparent 40%); }
@@ -150,7 +152,9 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 .notice.err { border-color: #ef9a9a; background: color-mix(in srgb, #ef9a9a 16%, var(--card)); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--gap); }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--pad); box-shadow: var(--shadow); min-width: 0; }
-.card h3 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: baseline; gap: 8px; }
+.card h3 { font-size: 16px; margin: 0 0 12px; display: flex; align-items: center; gap: 10px; letter-spacing: -.01em; }
+.card h3 .ic-img { width: 40px; height: 40px; flex: none; filter: drop-shadow(0 3px 6px rgba(0,0,0,.18)); }
+.card h3 .ttl { min-width: 0; }
 .card h3 .ic { font-size: 16px; }
 .card h3 .sub { color: var(--muted); font-weight: 500; font-size: 12px; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 10px 0 0; }
@@ -211,6 +215,14 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
   background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 70%, #fff), var(--gold)); color: #2b2005; font-weight: 800; }
 .celebrate.jackpot { font-size: 20px; padding: 20px 22px; background: linear-gradient(135deg, #fff1b8, #ffd54a 40%, #f59e0b); }
 .celebrate small { display: block; font-weight: 600; opacity: .8; font-size: 13px; }
+.celebrate { display: flex; align-items: center; gap: 14px; }
+.celebrate .cel-img { width: 58px; height: 58px; flex: none; position: relative; }
+.celebrate.jackpot .cel-img { width: 128px; height: auto; margin: -8px 0; }
+.celebrate .cel-text { position: relative; min-width: 0; }
+.empty.art { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 2px; text-align: center; }
+.empty.art img { width: 112px; height: auto; opacity: .95; }
+.notice.has-art { display: flex; align-items: center; gap: 12px; }
+.notice .notice-img { width: 76px; height: auto; flex: none; }
 .confetti { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; opacity: .9; animation: fall 2.6s linear infinite; }
 @keyframes fall { to { transform: translateY(140px) rotate(540deg); opacity: 0; } }
 @keyframes pop { 0% { transform: scale(.4) rotate(-30deg); opacity: 0; } 70% { transform: scale(1.15); } 100% { transform: none; opacity: 1; } }
@@ -276,14 +288,16 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 textarea.diag { display: block; width: 100%; height: 240px; font-size: 11px; margin-top: 8px; background: var(--chip); color: var(--ink);
   border: 1px solid var(--line); border-radius: 10px; padding: 8px; resize: vertical; }
 footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px 16px 30px; }
+@media (max-width: 900px) { .hero { grid-template-columns: 1.1fr 1fr; } .hero-art { display: none; } }
 @media (max-width: 720px) { .hero { grid-template-columns: 1fr; } .hero-right { align-items: flex-start; } .hero-balls { justify-content: flex-start; } }
+@media (max-width: 520px) { .notice .notice-img { width: 56px; } .celebrate.jackpot .cel-img { width: 84px; } }
 @media (max-width: 420px) { .grid { grid-template-columns: 1fr; } .hero { padding: 18px; } .hero h2 { font-size: 20px; } .hero .ball { width: 34px; height: 34px; font-size: 13px; }
   .themes { grid-template-columns: repeat(2, 1fr); } .count { min-width: 0; flex: 1; } }
 </style>
 </head>
 <body>
 <header><div class="bar">
-  <div class="brand"><span class="logo">🎰</span><span>DH Lotto 45</span><span class="ver">v__VERSION__</span></div>
+  <div class="brand"><img class="logo-img" src="static/img/logo.webp" alt="" width="34" height="34"><span>DH Lotto 45</span><span class="ver">v__VERSION__</span></div>
   <div class="tabs" id="tabs" role="tablist"></div>
   <span class="spacer"></span>
   <button class="tool" id="btn-lang" type="button"></button>
@@ -464,8 +478,22 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     if (r.indexOf("1등") >= 0) return "r-gold";
     return isWin(r) ? "r-win" : "r-lose";
   }
+  var ART = { summary: "icon_wallet", buy: "icon_buy", favorites: "icon_favorite", lotto_current: "icon_lotto",
+    lotto_prev: "icon_history", pension_current: "icon_pension", pension_prev: "icon_history", winning: "icon_winning",
+    stats: "icon_stats", auto: "icon_auto" };
+  // Decorative image; if it fails to load, fall back to the emoji (or nothing).
+  function art(name, cls, fallback) {
+    var img = h("img", { cls: cls, src: "static/img/" + name + ".webp", alt: "", decoding: "async" });
+    img.addEventListener("error", function () {
+      var alt = h("span", { cls: "ic", text: fallback || "" });
+      if (img.parentNode) img.parentNode.replaceChild(alt, img);
+    });
+    return img;
+  }
+  function emptyArt(text) { return h("div", { cls: "empty art" }, [art("empty", "", ""), h("span", { text: text })]); }
   function card(id, icon, title, sub, body) {
-    return h("section", { cls: "card", "data-card": id }, [h("h3", null, [h("span", { cls: "ic", text: icon }), title, sub ? h("span", { cls: "sub", text: sub }) : null])].concat(body));
+    var head = ART[id] ? art(ART[id], "ic-img", icon) : h("span", { cls: "ic", text: icon });
+    return h("section", { cls: "card", "data-card": id }, [h("h3", null, [head, h("span", { cls: "ttl", text: title }), sub ? h("span", { cls: "sub", text: sub }) : null])].concat(body));
   }
   function fmtTime(ts) {
     if (!ts) return "-";
@@ -540,6 +568,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     var fp = st(acc, "lotto645_first_prize");
     if (Number(fp) > 0) right.appendChild(h("div", { cls: "prize" }, [t("lastPrize") + "  ", h("b", { text: bigWon(fp) })]));
     hero.appendChild(right);
+    hero.appendChild(art("hero_machine", "hero-art", ""));
   }
   setInterval(function () {
     var a = document.getElementById("cd-lotto"), b = document.getElementById("cd-pension");
@@ -570,7 +599,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       rows.push(h("div", { cls: "row" + (isWin(res) ? " won" : "") }, [h("span", { cls: "idx", text: String(i) }),
         h("span", { cls: "main" }, balls(g.attributes.numbers, hits)), h("span", { cls: "res " + resCls(res), text: res })]));
     }
-    return rows.length ? h("div", { cls: "rows" }, rows) : h("div", { cls: "empty", text: t("none") });
+    return rows.length ? h("div", { cls: "rows" }, rows) : emptyArt(t("none"));
   }
   function lottoCurrentCard(acc) {
     var w = at(acc, "lotto45_weekly_purchase_count"), cnt = st(acc, "lotto45_weekly_purchase_count"), round = at(acc, "lotto45_game_1").round_no;
@@ -588,7 +617,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     return h("span", { cls: "ticket mono" }, [group ? h("span", { cls: "grp", text: group + t("groupSuffix") }) : null, h("span", { cls: "num", text: String(number || "") })]);
   }
   function pensionRows(games) {
-    if (!games || !games.length) return h("div", { cls: "empty", text: t("none") });
+    if (!games || !games.length) return emptyArt(t("none"));
     return h("div", { cls: "rows" }, games.map(function (g, i) {
       return h("div", { cls: "row" + (isWin(g.result) ? " won" : "") }, [h("span", { cls: "idx", text: String(i + 1) }), h("span", { cls: "main" }, [ticket(g.group, g.number)]),
         h("span", { cls: "res " + resCls(g.result), text: (g.result || "-") + (g.win_amount > 0 ? " · " + won(g.win_amount) : "") })]);
@@ -891,7 +920,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     if (!wins.length) return;
     var jackpot = wins.some(function (r) { return String(r).indexOf("1등") >= 0; });
     var best = jackpot ? wins.filter(function (r) { return String(r).indexOf("1등") >= 0; })[0] : wins[0];
-    var el = h("div", { cls: "celebrate" + (jackpot ? " jackpot" : "") }, [jackpot ? t("jackpot") : t("congrats"), h("small", { text: best + " · " + t("congratsSub") })]);
+    var el = h("div", { cls: "celebrate" + (jackpot ? " jackpot" : "") }, [art(jackpot ? "jackpot" : "icon_win", "cel-img", ""),
+      h("div", { cls: "cel-text" }, [jackpot ? t("jackpot") : t("congrats"), h("small", { text: best + " · " + t("congratsSub") })])]);
     var colors = ["#e0ad00", "#3fa9de", "#e5534b", "#8a8f98", "#79b33a", "#ffffff"];
     for (var c = 0; c < (jackpot ? 36 : 18); c++) {
       var p = h("span", { cls: "confetti" });
@@ -919,7 +949,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     var acc = currentAcc();
     renderHero(acc);
     renderCelebrate(acc);
-    if (!data.purchase_available) notes.appendChild(h("div", { cls: "notice warn" }, [h("b", { text: t("lottoClosed") }), h("div", { cls: "hint closed", text: t("closedBody") })]));
+    if (!data.purchase_available) notes.appendChild(h("div", { cls: "notice warn has-art" }, [art("empty", "notice-img", ""),
+      h("div", null, [h("b", { text: t("lottoClosed") }), h("div", { cls: "hint closed", text: t("closedBody") })])]));
     [["lotto45_login_error", "loginErr"], ["lotto45_purchase_error", "lottoErr"], ["pension720_purchase_error", "penErr"]].forEach(function (p) {
       var v = st(acc, p[0]); if (v && v !== "없음") notes.appendChild(h("div", { cls: "notice err", text: t(p[1]) + ": " + v }));
     });
