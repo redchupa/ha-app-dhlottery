@@ -2893,7 +2893,7 @@ async def _after_purchase(acc_label: str, action: str, label: str, status: str, 
 _pending_spend: list = []          # 구매 직후 원장에 잡히기 전까지의 지출 [{acct, month, ts, cost}]
 _household_queue: list = []
 _household_task = None
-_insight_pub_at = 0.0
+_insight_pub_at = -1e9          # 부팅 직후(monotonic 이 작을 때)도 첫 회는 바로 발행
 INSIGHT_PUBLISH_SECONDS = 600
 
 

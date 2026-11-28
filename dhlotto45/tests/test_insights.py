@@ -298,7 +298,7 @@ async def fake_publish(account, entity_id, state, attributes=None):
 
 M.publish_sensor_for_account = fake_publish
 posts.clear()
-M._insight_pub_at = 0.0
+M._insight_pub_at = -1e9
 asyncio.run(M._insight_tick())
 asyncio.run(M._insight_tick())
 notes = [p for p in posts if p[0] == "services/persistent_notification/create"]
