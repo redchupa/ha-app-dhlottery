@@ -105,7 +105,7 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
 /* ================================================================ base */
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 14px/1.5 "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; }
+  font: 15px/1.6 "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; }
 body { background-image: var(--pattern); background-size: 22px 22px; min-height: 100vh; }
 button, input, select { font: inherit; color: inherit; }
 .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -156,11 +156,11 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 .card h3 .ic-img { width: 40px; height: 40px; flex: none; filter: drop-shadow(0 3px 6px rgba(0,0,0,.18)); }
 .card h3 .ttl { min-width: 0; }
 .card h3 .ic { font-size: 16px; }
-.card h3 .sub { color: var(--muted); font-weight: 500; font-size: 12px; }
+.card h3 .sub { color: var(--muted); font-weight: 500; font-size: 12.5px; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 10px 0 0; }
 .kv dt { color: var(--muted); } .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .big { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
-.hint { color: var(--muted); font-size: 12px; }
+.hint { color: var(--muted); font-size: 13px; line-height: 1.55; }
 .rows { display: flex; flex-direction: column; gap: 8px; }
 .row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--chip); min-width: 0; border: 1px solid transparent; }
 .compact .row { padding: 6px 8px; }
@@ -264,7 +264,10 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 .notice .closed { margin-top: 4px; line-height: 1.5; }
 .notice.ok { border-color: #8bd3a0; background: color-mix(in srgb, #8bd3a0 16%, var(--card)); }
 .btn.small { padding: 6px 10px; font-size: 13px; border-radius: 9px; }
-.row.fav .fname { min-width: 56px; max-width: 96px; font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.fav { flex-wrap: wrap; row-gap: 8px; }
+.row.fav .fname { flex: 1 1 auto; min-width: 0; font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.fav .main { order: 5; flex: 1 1 100%; }
+.ticket { white-space: nowrap; }
 .ball.q { background: var(--chip); color: var(--muted); border: 1px dashed var(--line); box-shadow: none; }
 .genopts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; margin-top: 8px; }
 .genopts label { display: inline-flex; gap: 4px; align-items: center; background: var(--chip); border-radius: 8px; padding: 4px 8px; cursor: pointer; }
@@ -274,7 +277,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 .bstack { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
 .sbar { width: 42%; min-height: 2px; border-radius: 4px 4px 0 0; }
 .sbar.spend { background: color-mix(in srgb, var(--ink) 38%, transparent); } .sbar.win { background: var(--gold); }
-.blbl { font-size: 10px; color: var(--muted); margin-top: 3px; }
+.blbl { font-size: 11px; color: var(--muted); margin-top: 3px; }
 .legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 .days { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -313,7 +316,7 @@ textarea.diag { display: block; width: 100%; height: 240px; font-size: 11px; mar
 .heat .cell { position: relative; aspect-ratio: 1; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: var(--chip); border: 1px solid var(--line); font-variant-numeric: tabular-nums; min-width: 0; }
 .heat .cell b { font-size: 14px; line-height: 1; }
-.heat .cell small { font-size: 9px; color: var(--muted); margin-top: 2px; }
+.heat .cell small { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .heat .cell.top { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
 .heat-legend { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
 .heat-legend .scale { flex: 1; height: 8px; border-radius: 6px; }
@@ -339,7 +342,7 @@ textarea.diag { display: block; width: 100%; height: 240px; font-size: 11px; mar
 .receipt .nums .q { color: #999; }
 .receipt .rfoot { display: flex; justify-content: space-between; border-top: 2px solid #2a2a2a; margin-top: 6px; padding-top: 6px; font-size: 13px; font-weight: 800; }
 .receipt .barcode { height: 34px; margin-top: 10px; border-radius: 2px; }
-.receipt .rnote { font-size: 10px; color: #777; text-align: center; margin-top: 4px; }
+.receipt .rnote { font-size: 11px; color: #777; text-align: center; margin-top: 4px; }
 /* mobile quick-jump bar */
 #qnav { display: none; }
 .card { scroll-margin-top: 150px; }
@@ -348,12 +351,43 @@ textarea.diag { display: block; width: 100%; height: 240px; font-size: 11px; mar
     background: color-mix(in srgb, var(--card) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); scrollbar-width: none; }
   #qnav::-webkit-scrollbar { display: none; }
   #qnav button { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 54px; padding: 4px 6px; border: 0; border-radius: 10px;
-    background: transparent; color: var(--ink); font-size: 10px; cursor: pointer; }
+    background: transparent; color: var(--ink); font-size: 11px; cursor: pointer; }
   #qnav button img { width: 26px; height: 26px; }
   #qnav button.top { font-size: 18px; justify-content: center; }
   #qnav button:active { background: var(--chip); }
   main { padding-bottom: 86px; }
   footer { padding-bottom: 90px; }
+}
+/* collapsible cards and sections */
+.card-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 0; margin: 0; border: 0; background: none; color: inherit;
+  font: inherit; text-align: left; cursor: pointer; border-radius: 10px; min-height: 44px; }
+.card-head:focus-visible, .fold-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.card-head .ttl { font-weight: 800; }
+.card-head .sub { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chev { margin-left: auto; flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--chip);
+  color: var(--muted); font-size: 14px; transition: transform .18s ease; }
+.card.collapsed .chev, .fold:not(.open) > .fold-btn .chev { transform: rotate(-90deg); }
+.card.collapsed h3 { margin-bottom: 0; }
+.card.collapsed { padding-top: calc(var(--pad) - 4px); padding-bottom: calc(var(--pad) - 4px); }
+.fold { margin-top: 10px; border: 1px dashed var(--line); border-radius: 12px; }
+.fold-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border: 0; background: none; color: inherit;
+  font: inherit; font-weight: 700; text-align: left; cursor: pointer; border-radius: 12px; min-height: 44px; }
+.fold-body { padding: 0 12px 12px; }
+.fold-body > .manual:first-child { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .chev { transition: none; } }
+/* phone: bigger tap targets, 16px inputs (no iOS zoom), roomier text */
+@media (max-width: 720px) {
+  html, body { font-size: 15.5px; }
+  .btn { min-height: 44px; padding: 10px 16px; }
+  .btn.small { min-height: 40px; }
+  .mini { min-height: 36px; min-width: 36px; padding: 6px 10px; }
+  .tab { padding: 8px 14px; min-height: 40px; }
+  .tool { min-height: 40px; }
+  input, select, textarea { font-size: 16px !important; min-height: 44px; }
+  .pball { height: 38px; font-size: 14px; }
+  .row { padding: 10px 12px; }
+  .hint { font-size: 13.5px; }
+  #qnav button { font-size: 11px; min-height: 48px; }
 }
 footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px 16px 30px; }
 @media (max-width: 900px) { .hero { grid-template-columns: 1.1fr 1fr; } .hero-art { display: none; } }
@@ -445,7 +479,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       nsAbsent: "오래 안 나온 번호", nsTimes: "회", nsAgo: "회 전", nsNever: "범위 밖", nsExpected: "평균 기대", nsTotal: "누적",
       nsNote: "보너스 번호 제외 · 과거 통계일 뿐 다음 추첨 확률은 모든 번호가 같습니다.", nsLoading: "통계를 불러오는 중…", nsFail: "번호 통계를 불러오지 못했습니다: ",
       exportCsv: "⬇ CSV 내보내기", exportJson: "⬇ 백업(JSON)", importJson: "⬆ 백업 가져오기", importOk: "가져오기 완료: 추가 ", importSkip: "건, 건너뜀 ", importFail: "가져오기 실패: ",
-      exportFail: "내보내기 실패: ", qTop: "맨 위로",
+      exportFail: "내보내기 실패: ", qTop: "맨 위로", expand: "펼치기", collapse: "접기",
+      foldLotto: "✍️ 번호 직접 고르기 (수동·반자동)", foldPension: "✍️ 조·번호 직접 고르기 (수동)", foldSchedule: "➕ 일정 추가", foldNotify: "🔔 알림 설정",
       q_summary: "요약", q_buy: "구매", q_receipt: "용지", q_favorites: "즐겨찾기", q_lotto_current: "로또", q_lotto_prev: "지난 로또",
       q_pension_current: "연금", q_pension_prev: "지난 연금", q_winning: "당첨번호", q_numstats: "번호통계", q_stats: "지출통계", q_auto: "자동",
       pickerOpen: "🎱 번호판", pickerClose: "🎱 번호판 닫기", pickerClear: "초기화", pickerHint: "1~45 중 최대 6개 선택 (남은 칸은 자동)",
@@ -497,7 +532,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       nsAbsent: "Long absent", nsTimes: "x", nsAgo: " ago", nsNever: "out of range", nsExpected: "Expected", nsTotal: "All-time",
       nsNote: "Bonus numbers excluded · past statistics only; every number has the same odds next draw.", nsLoading: "Loading statistics…", nsFail: "Could not load number stats: ",
       exportCsv: "⬇ Export CSV", exportJson: "⬇ Backup (JSON)", importJson: "⬆ Import backup", importOk: "Imported: added ", importSkip: ", skipped ", importFail: "Import failed: ",
-      exportFail: "Export failed: ", qTop: "Top",
+      exportFail: "Export failed: ", qTop: "Top", expand: "Expand", collapse: "Collapse",
+      foldLotto: "✍️ Pick numbers (manual / semi-auto)", foldPension: "✍️ Pick group & number (manual)", foldSchedule: "➕ Add schedule", foldNotify: "🔔 Notification settings",
       q_summary: "Summary", q_buy: "Buy", q_receipt: "Slip", q_favorites: "Favorites", q_lotto_current: "Lotto", q_lotto_prev: "Last lotto",
       q_pension_current: "Pension", q_pension_prev: "Last pension", q_winning: "Winning", q_numstats: "Numbers", q_stats: "Spending", q_auto: "Auto",
       pickerOpen: "🎱 Number Pad", pickerClose: "🎱 Hide Pad", pickerClear: "Clear", pickerHint: "Pick up to 6 numbers (rest filled with auto)",
@@ -602,9 +638,35 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     return img;
   }
   function emptyArt(text) { return h("div", { cls: "empty art" }, [art("empty", "", ""), h("span", { text: text })]); }
+  var DEFAULT_COLLAPSED = ["receipt", "winning", "numstats", "stats", "auto"];
+  var openFolds = {};
+  function collapsedList() { return Array.isArray(prefs.collapsed_cards) ? prefs.collapsed_cards : DEFAULT_COLLAPSED; }
+  function isCollapsed(id) { return collapsedList().indexOf(id) >= 0; }
+  function toggleCard(id) {
+    var list = collapsedList().slice(), i = list.indexOf(id);
+    if (i >= 0) list.splice(i, 1); else list.push(id);
+    setPref("collapsed_cards", list);
+    if (i >= 0 && id === "numstats") loadNumStats(false).then(render);
+  }
+  // Collapsible card: the whole title row is a button (keyboard + screen reader friendly).
   function card(id, icon, title, sub, body) {
+    var closed = isCollapsed(id), bid = "cb-" + id;
     var head = ART[id] ? art(ART[id], "ic-img", icon) : h("span", { cls: "ic", text: icon });
-    return h("section", { cls: "card", "data-card": id }, [h("h3", null, [head, h("span", { cls: "ttl", text: title }), sub ? h("span", { cls: "sub", text: sub }) : null])].concat(body));
+    var btn = h("button", { cls: "card-head", type: "button", "aria-expanded": closed ? "false" : "true", "aria-controls": bid,
+      title: closed ? t("expand") : t("collapse"), onclick: function () { toggleCard(id); } },
+      [head, h("span", { cls: "ttl", text: title }), sub ? h("span", { cls: "sub", text: sub }) : null, h("span", { cls: "chev", "aria-hidden": "true", text: "▾" })]);
+    var bodyEl = h("div", { cls: "card-body", id: bid }, body);
+    if (closed) bodyEl.hidden = true;
+    return h("section", { cls: "card" + (closed ? " collapsed" : ""), "data-card": id }, [h("h3", null, [btn]), bodyEl]);
+  }
+  // Fold the nodes pushed since `start` into an expandable section (closed until the user opens it).
+  function foldTail(body, start, key, label) {
+    var nodes = body.splice(start, body.length - start), open = !!openFolds[key], fid = "fold-" + key;
+    var btn = h("button", { cls: "fold-btn", type: "button", "aria-expanded": open ? "true" : "false", "aria-controls": fid,
+      onclick: function () { openFolds[key] = !openFolds[key]; render(); } }, [h("span", { text: label }), h("span", { cls: "chev", "aria-hidden": "true", text: "▾" })]);
+    var box = h("div", { cls: "fold-body", id: fid }, nodes);
+    if (!open) box.hidden = true;
+    body.push(h("div", { cls: "fold" + (open ? " open" : "") }, [btn, box]));
   }
   function fmtTime(ts) {
     if (!ts) return "-";
@@ -797,6 +859,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     if (data.lotto_enabled) {
       body.push(h("div", { cls: "sect", text: "🎱 " + t("lottoName") }));
       body.push(h("div", { cls: "btns" }, [btn(t("auto1"), "lotto_auto_1", "", !avail), btn(t("auto5"), "lotto_auto_5", "", !avail)]));
+      var lottoFoldStart = body.length;
       var dr = draft(acc);
       var curVal = dr.lotto !== undefined ? dr.lotto : (acc.manual_numbers || "");
       var li = h("input", { cls: "lotto mono", id: "lotto-manual", value: curVal, oninput: function () { dr.lotto = li.value; if (dr.pickerOpen) syncPicker(); }, placeholder: "1,7,12,auto,auto,auto", "aria-label": t("manual1"), autocomplete: "off" });
@@ -842,10 +905,12 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       body.push(genOptions());
       body.push(prev);
       body.push(h("div", { cls: "hint", text: t("manualHint") + " · " + t("genNote") }));
+      foldTail(body, lottoFoldStart, "lotto-manual", t("foldLotto"));
     }
     if (data.pension_enabled) {
       body.push(h("div", { cls: "sect", text: "🎟️ " + t("pensionName") }));
       body.push(h("div", { cls: "btns" }, [btn(t("pAuto1"), "pension_auto_1"), btn(t("pAuto5"), "pension_auto_5")]));
+      var penFoldStart = body.length;
       var pd = draft(acc), pm = String(acc.pension_manual || "").split(",");
       var pg = pd.group !== undefined ? pd.group : (pm[0] || "").trim(), pn = pd.digits !== undefined ? pd.digits : (pm[1] || "").trim();
       var sel = h("select", { id: "p-group", "aria-label": "group" }, [1, 2, 3, 4, 5].map(function (g) {
@@ -858,6 +923,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
         sel.value = String(rnd(5) + 1); var d = ""; for (var i = 0; i < 6; i++) d += String(rnd(10)); num.value = d;
         pd.group = sel.value; pd.digits = d;
       } })]));
+      foldTail(body, penFoldStart, "pension-manual", t("foldPension"));
     }
     var la = acc.last_action;
     if (la) {
@@ -1041,7 +1107,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
 
   // ------------------------------------------------------------ number stats heatmap
   function loadNumStats(force) {
-    if (!data || !data.lotto_enabled) return Promise.resolve();
+    if (!data || !data.lotto_enabled || isCollapsed("numstats")) return Promise.resolve();
     if (!force && numStats && numStats.window === nsRounds && Date.now() - numStatsAt < 600000) return Promise.resolve();
     return getJson("api/number-stats?rounds=" + nsRounds).then(function (j) { numStats = j; numStatsAt = Date.now(); numStatsErr = ""; })
       .catch(function (e) { numStatsErr = e.message; });
@@ -1066,7 +1132,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       var color = nsView === "freq" ? "var(--gold)" : "#3fa9de";
       var c = h("div", { cls: "cell" + (nsView === "freq" && hot.indexOf(x.n) >= 0 ? " top" : ""),
         title: x.n + " · " + x.count + t("nsTimes") + " · " + (x.gap === null ? t("nsNever") : x.gap + t("nsAgo")) + (x.total ? " · " + t("nsTotal") + " " + x.total + t("nsTimes") : "") },
-        [h("b", { text: String(x.n) }), h("small", { text: nsView === "freq" ? x.count + t("nsTimes") : (x.gap === null ? "—" : x.gap + t("nsAgo")) })]);
+        [h("b", { text: String(x.n) }), h("small", { text: nsView === "freq" ? String(x.count) : (x.gap === null ? "—" : String(x.gap)) })]);
       c.style.background = "color-mix(in srgb, " + color + " " + Math.round(8 + v * 72) + "%, var(--chip))";
       return c;
     })));
@@ -1181,7 +1247,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
         e.target.setAttribute("aria-pressed", k >= 0 ? "false" : "true");
       } });
     }));
-    body.push(h("div", { cls: "sect", text: "➕ " + t("autoAdd") }));
+    var addStart = body.length;
     body.push(h("div", { cls: "manual" }, [act, tm, who]));
     body.push(h("div", { cls: "manual" }, [days, h("button", { cls: "btn small", type: "button", text: t("autoAdd"), disabled: ab.schedules.length >= 8 ? "disabled" : null, onclick: function () {
       if (!autoDraft.days.length) { toast(t("autoNeedDay"), "err"); return; }
@@ -1189,8 +1255,9 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       saveSettings({ auto_buy: { schedules: ab.schedules.concat([sc]) } });
     } })]));
     body.push(h("div", { cls: "hint", text: "🛡️ " + t("autoGuard") }));
+    foldTail(body, addStart, "schedule-add", t("foldSchedule"));
 
-    body.push(h("div", { cls: "sect", text: "🔔 " + t("notify") }));
+    var notifyStart = body.length;
     function ntog(key, label) {
       return h("label", { cls: "field" }, [h("span", { text: label }), h("input", { type: "checkbox", checked: nt[key] ? "checked" : null, onchange: function (e) {
         var c = {}; c[key] = e.target.checked; saveSettings({ notify: c });
@@ -1212,6 +1279,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       postJson("api/notify-test", {}).then(function (j) { toast(j.ok ? t("nTestOk") : t("nTestFail"), j.ok ? "ok" : "err"); }).catch(function (e) { toast(t("nTestFail") + " " + e.message, "err"); });
     } }), h("button", { cls: "btn secondary small", type: "button", text: t("diag"), onclick: copyDiag })]));
     body.push(h("div", { cls: "hint", text: t("nEvents") }));
+    foldTail(body, notifyStart, "notify", t("foldNotify"));
     return card("auto", "⏰", t("auto"), ab.enabled ? "ON" : "OFF", body);
   }
 

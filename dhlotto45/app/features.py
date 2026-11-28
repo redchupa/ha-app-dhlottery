@@ -388,6 +388,12 @@ def needs_low_deposit_alert(balance, threshold: int, today: str, last_alert_day)
     return threshold > 0 and bal < threshold and last_alert_day != today
 
 
+def safe_notify_text(text, limit: int = 300) -> str:
+    """알림 본문용: 꺾쇠(HTML)·제어문자 제거, 길이 제한. 사이트 오류 문구가 그대로 실리기 때문."""
+    s = "".join(" " if ch.isspace() else ch for ch in str(text or "") if ch.isprintable() or ch.isspace())
+    return " ".join(s.replace("<", "").replace(">", "").split())[:limit]
+
+
 def win_message(label: str, item: dict) -> tuple:
     game = "로또 6/45" if item["game"] == "lotto" else "연금복권720+"
     amt = f" · {item['amount']:,}원" if item.get("amount") else " · 당첨금은 동행복권에서 확인하세요"
@@ -398,6 +404,7 @@ def win_message(label: str, item: dict) -> tuple:
 
 def purchase_message(label: str, action_label: str, status: str, message: str, source: str) -> tuple:
     src = {"schedule": "정기 자동 구매", "button": "버튼", "dashboard": "대시보드"}.get(source, source)
+    message = safe_notify_text(message, 200)
     if status == "success":
         return f"✅ 구매 완료 ({label})", f"{action_label} · {message} [{src}]"
     if status == "skipped":

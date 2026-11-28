@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.10.0
+Lotto 45 Add-on Main Application v2.11.0
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -113,7 +113,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.10.0"
+APP_VERSION = "2.11.0"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -2405,7 +2405,12 @@ async def api_relogin(request: Request):
     account = accounts.get(username) if username else None
     if account is None or not account.enabled:
         raise HTTPException(status_code=404, detail="계정을 찾을 수 없습니다.")
+    reason, status = _relogin_block_reason(account)
+    if reason:
+        raise HTTPException(status_code=status, detail=reason)
 
+    _relogin_busy.add(username)
+    _relogin_last[username] = time.monotonic()
     try:
         if account.client is None:
             ok = await init_account(account)
@@ -2418,7 +2423,32 @@ async def api_relogin(request: Request):
         return JSONResponse({"ok": True, "logged_in": True}, headers=_SECURITY_HEADERS)
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[DASH][{mask_username(username)}] 원클릭 재로그인 실패: {e}")
-        raise HTTPException(status_code=500, detail=f"재로그인 실패: {str(e)[:180]}")
+        # 응답에는 실제 아이디가 섞이지 않게 별칭으로 바꾼다(로그 필터는 응답에 적용되지 않음).
+        msg = FT.scrub_text(str(e).replace(username, _alias_of(username)[1]))[:180]
+        raise HTTPException(status_code=500, detail=f"재로그인 실패: {msg}")
+    finally:
+        _relogin_busy.discard(username)
+
+
+# 재로그인 연타로 동행복권 로그인 실패 잠금(5회)에 걸리지 않도록 계정당 간격을 둔다.
+RELOGIN_MIN_INTERVAL = 60.0
+_relogin_last: Dict[str, float] = {}
+_relogin_busy: set = set()
+
+
+def _relogin_block_reason(account: "AccountData") -> tuple:
+    """재로그인을 막아야 하면 (사유, HTTP 상태), 아니면 ("", 0)."""
+    username = account.username
+    if username in _relogin_busy:
+        return "이미 로그인 중입니다. 잠시만 기다려 주세요.", 409
+    if account.last_action and account.last_action.get("status") == "running":
+        return "이 계정의 구매가 진행 중이라 지금은 재로그인할 수 없습니다.", 409
+    if not is_purchase_available_now():
+        return "지금은 동행복권 점검·구매 불가 시간이라 로그인하지 않습니다 (06:00 이후 자동으로 다시 로그인).", 409
+    wait = RELOGIN_MIN_INTERVAL - (time.monotonic() - _relogin_last.get(username, -1e9))
+    if wait > 0:
+        return f"로그인 실패 잠금을 막기 위해 {int(wait) + 1}초 후에 다시 시도하세요.", 429
+    return "", 0
 
 
 @app.get("/api/simulate")
@@ -2798,6 +2828,7 @@ async def api_stats(request: Request, account: str = ""):
 
 
 _LEDGER_IMPORT_MAX_BODY = 2 * 1024 * 1024
+_notify_test_at = -1e9
 
 
 @app.get("/api/ledger/export")
@@ -2847,6 +2878,10 @@ async def api_notify_test(request: Request):
     """현재 알림 설정으로 테스트 알림 1건 보내기."""
     _require_ingress(request)
     _require_csrf(request)
+    global _notify_test_at
+    if time.monotonic() - _notify_test_at < 10:
+        raise HTTPException(status_code=429, detail="테스트 알림은 10초에 한 번만 보낼 수 있습니다.")
+    _notify_test_at = time.monotonic()
     ok = await notify_user("🔔 DH Lotto 45 테스트 알림", "알림 설정이 정상입니다.", "dhlotto45_test")
     return JSONResponse({"ok": ok}, headers=_SECURITY_HEADERS)
 

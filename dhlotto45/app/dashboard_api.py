@@ -204,6 +204,8 @@ THEMES = (
 CARD_IDS = ("summary", "buy", "receipt", "favorites", "lotto_current", "lotto_prev", "pension_current", "pension_prev",
             "winning", "numstats", "stats", "auto")
 LUCKY_MESSAGE_MAX = 40
+# 자주 안 쓰는 카드는 처음에 접어 둔다(제목만 보이고 누르면 펼쳐짐).
+DEFAULT_COLLAPSED = ("receipt", "winning", "numstats", "stats", "auto")
 
 DEFAULT_PREFS = {
     "theme": "system",
@@ -216,6 +218,7 @@ DEFAULT_PREFS = {
     "default_account": "",        # account_N (비우면 첫 계정)
     "card_order": list(CARD_IDS),
     "hidden_cards": [],
+    "collapsed_cards": list(DEFAULT_COLLAPSED),
 }
 
 
@@ -232,6 +235,7 @@ def normalize_prefs(raw) -> dict:
     out = dict(DEFAULT_PREFS)
     out["card_order"] = list(CARD_IDS)
     out["hidden_cards"] = []
+    out["collapsed_cards"] = list(DEFAULT_COLLAPSED)
     if p.get("theme") in THEMES:
         out["theme"] = p["theme"]
     if p.get("lang") in ("ko", "en"):
@@ -256,6 +260,9 @@ def normalize_prefs(raw) -> dict:
     hidden = p.get("hidden_cards")
     if isinstance(hidden, list):
         out["hidden_cards"] = [c for c in CARD_IDS if c in hidden]
+    collapsed = p.get("collapsed_cards")
+    if isinstance(collapsed, list):
+        out["collapsed_cards"] = [c for c in CARD_IDS if c in collapsed]
     return out
 
 

@@ -37,6 +37,13 @@ jobs:
           python dhlotto45/tests/test_pension.py
           python dhlotto45/tests/test_dashboard.py
           python dhlotto45/tests/test_features.py
+          python dhlotto45/tests/test_security.py
+
+      # 휴대폰·태블릿·PC 폭 화면 점검(헤드리스 Chrome, 러너에 기본 설치됨)
+      - name: UI layout test
+        env:
+          REQUIRE_UI_TEST: "1"
+        run: python dhlotto45/tests/test_ui_layout.py
 
   # 공개 저장소: API 키·토큰·비밀번호·사설 IP 가 커밋에 들어가지 않았는지 검사 (.gitleaks.toml)
   secret-scan:
