@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.4.11
+Lotto 45 Add-on Main Application v2.5.0
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -9,6 +9,7 @@ import os
 import asyncio
 import logging
 import random
+import secrets
 import time
 from typing import Optional, Dict, List
 from datetime import date, datetime, timezone, timedelta
@@ -20,7 +21,7 @@ try:
 except ImportError:
     _TZ_KST = timezone(timedelta(hours=9))
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -33,7 +34,30 @@ from dh_pension_browser import (
     DhPensionBrowserError,
     validate_manual_selection,
 )
-from dh_pension_history import group_rounds, build_round, summarize
+from dashboard_api import (
+    ALLOWED_ACTIONS,
+    CSRF_HEADER,
+    LOTTO_ACTIONS,
+    PENSION_ACTIONS,
+    DashboardInputError,
+    AliasLogFilter,
+    account_aliases,
+    action_label,
+    csrf_ok,
+    is_ingress_client,
+    judge_outcome,
+    normalize_lotto_manual,
+    normalize_pension_manual,
+    resolve_alias,
+)
+from dashboard_page import PAGE_TEMPLATE
+from dh_pension_history import (
+    build_round,
+    group_rounds,
+    result_style as pension_result_style,
+    select_rounds,
+    summarize,
+)
 from mqtt_discovery import MQTTDiscovery, publish_sensor_mqtt
 from purchase_guard import (
     DAILY_PENSION_LIMIT,
@@ -76,6 +100,12 @@ class AccountData:
         self.update_task: Optional[asyncio.Task] = None
         # 구매 불가 시간대(토요일 20:00~일요일 06:00)에 이전 회차 당첨 결과 1회만 동기화
         self.prev_round_result_synced_when_unavailable: bool = False
+        # 사이드바 대시보드용: 마지막으로 발행한 센서 값 {entity_id: {state, attributes, ts}}
+        self.sensor_cache: Dict[str, dict] = {}
+        # 대시보드에서 실행한 마지막 구매 작업 상태
+        self.last_action: Optional[dict] = None
+
+APP_VERSION = "2.5.0"
 
 # Configuration variables
 config = {
@@ -96,6 +126,15 @@ purchase_guard = InterAccountPurchaseGuard(cooldown_seconds=INTER_ACCOUNT_COOLDO
 pension_daily_tracker = DailyPensionPurchaseTracker(daily_limit=DAILY_PENSION_LIMIT)
 mqtt_client: Optional[MQTTDiscovery] = None
 event_loop: Optional[asyncio.AbstractEventLoop] = None
+
+
+def install_log_alias_filter(usernames) -> None:
+    """애드온 로그에서 실제 아이디를 Account_N 별칭으로 바꾼다(로그 공유 시 아이디 노출 방지)."""
+    f = AliasLogFilter(account_aliases(usernames))
+    for handler in logging.getLogger().handlers:
+        for old in [x for x in handler.filters if isinstance(x, AliasLogFilter)]:
+            handler.removeFilter(old)
+        handler.addFilter(f)
 
 
 def load_accounts_from_env():
@@ -472,6 +511,7 @@ async def execute_pension_purchase(account: AccountData, count: int):
             "friendly_name": "연금복권 구매 오류",
             "icon": "mdi:cart-check",
         })
+        await _refresh_pension_history_after_purchase(account)
     except asyncio.TimeoutError:
         # 180초 안에 안 끝남 = 구매 도중일 수 있음(이중 지출 위험) → 확인 요망.
         msg = ("구매 시간 초과(180초): 브라우저가 응답하지 않습니다. 구매가 진행됐을 수 "
@@ -504,6 +544,19 @@ async def execute_pension_purchase(account: AccountData, count: int):
         })
     finally:
         purchase_guard.release(username, record_cooldown=purchase_attempted)
+
+
+async def _refresh_pension_history_after_purchase(account: AccountData):
+    """구매 성공 직후 연금 구매내역 센서를 갱신한다(다음 주기까지 기다리지 않도록).
+
+    HTTP 세션으로 원장을 조회하므로 필요하면 재로그인한다. 실패해도 구매 결과에는 영향 없음.
+    """
+    try:
+        if account.client and not account.client.logged_in:
+            await account.client.async_login()
+        await publish_pension_history_sensors(account)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[PENSION-HIST][{mask_username(account.username)}] 구매 후 내역 갱신 실패: {e}")
 
 
 def _parse_pension_manual(text):
@@ -610,6 +663,7 @@ async def execute_pension_manual_purchase(account: AccountData):
             "friendly_name": "연금복권 구매 오류",
             "icon": "mdi:cart-check",
         })
+        await _refresh_pension_history_after_purchase(account)
     except asyncio.TimeoutError:
         msg = ("수동 구매 시간 초과(180초): 브라우저가 응답하지 않습니다. 구매가 진행됐을 수 "
                "있으니 동행복권 구매내역을 확인한 뒤 재시도하세요.")
@@ -851,6 +905,7 @@ async def init_clients():
     global mqtt_client
     
     load_accounts_from_env()
+    install_log_alias_filter(list(accounts.keys()))
     
     if not config["accounts"]:
         logger.error("No accounts configured")
@@ -962,7 +1017,7 @@ async def lifespan(app: FastAPI):
     """Lifecycle"""
     global event_loop
     
-    logger.info("Starting v2.4.11 Multi-Account...")
+    logger.info(f"Starting v{APP_VERSION} Multi-Account...")
     
     event_loop = asyncio.get_running_loop()
     await init_clients()
@@ -985,15 +1040,17 @@ async def lifespan(app: FastAPI):
     await cleanup_clients()
 
 
-app = FastAPI(title="Lotto 45 Multi", version="2.4.11", lifespan=lifespan)
+app = FastAPI(title="Lotto 45 Multi", version=APP_VERSION, lifespan=lifespan)
 
 # CORS: 모바일 앱 및 외부/Ingress 접근 지원
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # 자격증명(쿠키) 허용 안 함: 다른 사이트가 사용자의 HA 세션으로 이 API 를 부르거나
+    # 응답을 읽지 못하게 한다(allow_origins="*" + credentials 는 출처를 그대로 반사해 위험).
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
     expose_headers=["X-Ingress-Request"],
 )
 
@@ -1379,6 +1436,40 @@ async def publish_pension_result_sensors(account: AccountData):
         logger.warning(f"[SENSOR][{username}] Failed to fetch pension720 results: {e}")
 
 
+PENSION_SLOT_SENSORS = 5
+
+
+async def _publish_pension_slot_sensors(account: AccountData, prefix: str, label: str, round_no: int, games: list):
+    """연금 매별 센서 pension720_game_{1..5} / pension720_prev_game_{1..5} 발행."""
+    total = len(games or [])
+    for i in range(1, PENSION_SLOT_SENSORS + 1):
+        if i <= total:
+            g = games[i - 1]
+            icon, color = pension_result_style(g.get("result"))
+            state = f"{g.get('group')}조 {g.get('number')}" if g.get("group") else str(g.get("number"))
+            attrs = {
+                "round_no": round_no,
+                "group": g.get("group"),
+                "number": g.get("number"),
+                "result": g.get("result"),
+                "rank": g.get("rank"),
+                "win_amount": g.get("win_amount", 0),
+                "color": color,
+                "total_in_round": total,
+                "friendly_name": f"연금 구매 {i} ({label})",
+                "icon": icon,
+            }
+        else:
+            state = "구매 내역 없음"
+            attrs = {
+                "round_no": round_no, "group": "", "number": "", "result": "-",
+                "rank": None, "win_amount": 0, "color": "grey", "total_in_round": total,
+                "friendly_name": f"연금 구매 {i} ({label})",
+                "icon": f"mdi:numeric-{i}-box-outline",
+            }
+        await publish_sensor_for_account(account, f"{prefix}_{i}", state, attrs)
+
+
 async def publish_pension_history_sensors(account: AccountData):
     """연금복권720 구매 내역 센서(로그인 필요, www 원장 selectMyLotteryledger.do, ltGdsCd=LP72).
 
@@ -1398,11 +1489,17 @@ async def publish_pension_history_sensors(account: AccountData):
         logger.warning(f"[PENSION-HIST][{username}] 조회 실패: {e}")
         return
 
-    # 회차(ltEpsd)별 그룹핑 → 이번/지난 회차 센서로 발행(집계는 dh_pension_history).
+    # 회차(ltEpsd)별 그룹핑 → 현재(판매 중)/이전(추첨 완료) 회차 센서로 발행.
+    # 기준 회차는 로또와 같다: 현재 = 최신 추첨 회차 + 1, 이전 = 추첨 완료 회차 중 구매가 있는 최근 회차.
     rounds = group_rounds(items)
-    ordered = sorted(rounds.keys(), reverse=True)
-    this_round = ordered[0] if ordered else 0
-    last_round = ordered[1] if len(ordered) > 1 else 0
+    latest_drawn = _safe_int(account.sensor_cache.get("pension720_round", {}).get("state"))
+    if latest_drawn <= 0:
+        try:
+            latest_drawn = await _pension_latest_round()
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[PENSION-HIST][{username}] 최신 회차 조회 실패(구매 회차 순서로 대체): {e}")
+            latest_drawn = 0
+    this_round, last_round = select_rounds(rounds, latest_drawn)
 
     g_this, _, _ = build_round(rounds.get(this_round, []))
     await publish_sensor_for_account(account, "pension720_this_round", len(g_this), {
@@ -1421,6 +1518,11 @@ async def publish_pension_history_sensors(account: AccountData):
     await publish_sensor_for_account(account, "pension720_recent_count", len(items), {
         "friendly_name": "연금 최근 구매 건수 (14일)", "unit_of_measurement": "건", "icon": "mdi:history",
     })
+
+    # 로또의 '구매 게임 N (현재/이전)' 과 같은 형태의 매별 센서(각 5개).
+    # 한 회차에 5매를 넘게 사면 앞의 5매만 개별 센서로, 전체는 위 회차 센서 games 속성에 있다.
+    await _publish_pension_slot_sensors(account, "pension720_game", "현재", this_round, g_this)
+    await _publish_pension_slot_sensors(account, "pension720_prev_game", "이전", last_round, g_last)
 
     # 추첨 후 당첨 필드 구조 검증용(최초 당첨 발생 시 ltWnResult/wnRnk/ltWnAmt 확인)
     try:
@@ -1939,7 +2041,13 @@ async def update_sensors_for_account(account: AccountData):
 async def publish_sensor_for_account(account: AccountData, entity_id: str, state, attributes: dict = None):
     """Publish sensor"""
     username = account.username
-    
+    # 대시보드가 MQTT/HA 를 거치지 않고 바로 읽을 수 있도록 마지막 값을 보관한다.
+    account.sensor_cache[entity_id] = {
+        "state": state,
+        "attributes": attributes or {},
+        "ts": time.time(),
+    }
+
     if config["use_mqtt"] and mqtt_client and mqtt_client.connected:
         try:
             success = await publish_sensor_mqtt(
@@ -1980,44 +2088,181 @@ async def publish_sensor_for_account(account: AccountData, entity_id: str, state
         logger.error(f"[SENSOR][{username}] REST error: {e}")
 
 
+# 프로세스별 CSRF 토큰(재시작 시 바뀜). 대시보드 페이지에 심어 구매 요청 헤더로 돌려받는다.
+DASHBOARD_CSRF_TOKEN = secrets.token_urlsafe(32)
+# 대시보드 응답에서 뺄 센서(큰 진단 덤프 등)
+_DASHBOARD_EXCLUDED_SENSORS = {"pension720_manual_diag"}
+_dashboard_tasks: set = set()  # 실행 중 구매 작업 참조 보관(GC 방지)
+
+
+def _aliases() -> dict:
+    return account_aliases(list(accounts.keys()))
+
+
+def _client_host(request: Request) -> str:
+    return request.client.host if request.client else ""
+
+
+def _require_ingress(request: Request) -> None:
+    """구매·내역 API 는 HA Ingress(로그인된 HA 사용자) 경유만 허용."""
+    if not is_ingress_client(_client_host(request)):
+        raise HTTPException(status_code=403, detail="Home Assistant 사이드바(Ingress)에서만 사용할 수 있습니다.")
+
+
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    """Main page. Ingress 경유 시 배지 표시."""
-    accounts_html = "<ul>"
-    for username, account in accounts.items():
-        status = "✅" if account.client and account.client.logged_in else "❌"
-        enabled = "✅" if account.enabled else "❌"
-        accounts_html += f"<li><strong>{username}</strong>: {status} (Enabled: {enabled})</li>"
-    accounts_html += "</ul>"
-    ingress_badge = (
-        '<span style="background:#0d47a1;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;">Ingress</span>'
-        if is_ingress_request(request) else ""
+    """사이드바 대시보드(구매 내역 조회 + 구매 버튼). 데이터는 api/dashboard 에서 받는다."""
+    nonce = secrets.token_urlsafe(16)
+    html = (
+        PAGE_TEMPLATE.replace("__NONCE__", nonce)
+        .replace("__CSRF__", DASHBOARD_CSRF_TOKEN)
+        .replace("__VERSION__", APP_VERSION)
     )
-    return f"""
-    <!DOCTYPE html>
-    <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Lotto 45 v2.4.11</title>
-            <style>
-                body {{ font-family: Arial; margin: 40px; }}
-                .info {{ background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-            </style>
-        </head>
-        <body>
-            <h1>🎰 Lotto 45 <span style="color:#666;">v2.4.11 Multi-Account</span> {ingress_badge}</h1>
-            <div class="info">
-                <h2>Accounts ({len(accounts)})</h2>
-                {accounts_html}
-            </div>
-            <ul>
-                <li><a href="health">Health Check</a></li>
-                <li><a href="accounts">Accounts</a></li>
-            </ul>
-        </body>
-    </html>
-    """
+    csp = (
+        "default-src 'none'; "
+        f"script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
+        "connect-src 'self'; img-src 'self' data:; "
+        "base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+    )
+    headers = dict(_SECURITY_HEADERS)
+    headers["Content-Security-Policy"] = csp
+    return HTMLResponse(content=html, headers=headers)
+
+
+@app.get("/api/dashboard")
+async def api_dashboard(request: Request):
+    """대시보드 데이터. 실제 아이디 대신 Account_N 별칭만 내보낸다."""
+    _require_ingress(request)
+    aliases = _aliases()
+    out = []
+    for username, account in accounts.items():
+        aid, label = aliases[username]
+        sensors = {
+            k: {"state": v.get("state"), "attributes": v.get("attributes") or {}, "ts": v.get("ts")}
+            for k, v in account.sensor_cache.items()
+            if k not in _DASHBOARD_EXCLUDED_SENSORS
+        }
+        out.append({
+            "id": aid,
+            "label": label,
+            "enabled": account.enabled,
+            "logged_in": bool(account.client and getattr(account.client, "logged_in", False)),
+            "manual_numbers": account.manual_numbers_state,
+            "pension_manual": account.pension_manual_state,
+            "last_action": account.last_action,
+            "sensors": sensors,
+        })
+    actions = {}
+    for action in sorted(ALLOWED_ACTIONS):
+        label, amount = action_label(action)
+        actions[action] = {"label": label, "amount": amount}
+    return JSONResponse(
+        {
+            "version": APP_VERSION,
+            "lotto_enabled": bool(config["enable_lotto645"]),
+            "pension_enabled": bool(config.get("enable_pension720", True)),
+            "purchase_available": is_purchase_available_now(),
+            "actions": actions,
+            "accounts": out,
+        },
+        headers=_SECURITY_HEADERS,
+    )
+
+
+def _sync_manual_text(username: str, text_id: str, value: str) -> None:
+    """대시보드에서 바꾼 수동 번호를 HA text 엔티티에도 반영."""
+    if mqtt_client and mqtt_client.connected:
+        topic = f"homeassistant/text/{mqtt_client.topic_prefix}_{username}_{text_id}/state"
+        try:
+            mqtt_client.client.publish(topic, value, qos=1, retain=True)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[DASH] 수동 번호 MQTT 동기화 실패: {e}")
+
+
+async def _run_dashboard_action(account: AccountData, action: str, label: str) -> None:
+    """대시보드 구매 작업 실행 → account.last_action 에 결과 기록."""
+    started = time.time()
+    account.last_action = {"action": action, "label": label, "status": "running", "message": "", "started": started, "finished": None}
+    try:
+        if action in LOTTO_ACTIONS:
+            await execute_button_purchase(account, LOTTO_ACTIONS[action][0])
+            err_key, ok_key = "lotto45_purchase_error", "lotto45_latest_purchase"
+        elif action == "pension_manual":
+            await execute_pension_manual_purchase(account)
+            err_key, ok_key = "pension720_purchase_error", "pension720_last_purchase"
+        else:
+            await execute_pension_purchase(account, PENSION_ACTIONS[action][0])
+            err_key, ok_key = "pension720_purchase_error", "pension720_last_purchase"
+        status, message = judge_outcome(
+            account.sensor_cache.get(err_key), started, account.sensor_cache.get(ok_key)
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[DASH][{mask_username(account.username)}] {action} 실패: {e}", exc_info=True)
+        status, message = "error", str(e)[:255]
+    account.last_action = {
+        "action": action, "label": label, "status": status, "message": message,
+        "started": started, "finished": time.time(),
+    }
+    logger.info(f"[DASH][{mask_username(account.username)}] {action} → {status}: {message[:120]}")
+
+
+@app.post("/api/purchase")
+async def api_purchase(request: Request):
+    """대시보드 구매 요청. Ingress 전용 + CSRF 헤더 필수. 실행은 백그라운드, 결과는 api/dashboard 로 확인."""
+    _require_ingress(request)
+    if not csrf_ok(DASHBOARD_CSRF_TOKEN, request.headers.get(CSRF_HEADER)):
+        raise HTTPException(status_code=403, detail="보안 토큰이 올바르지 않습니다. 페이지를 새로고침한 뒤 다시 시도하세요.")
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail="요청 형식이 올바르지 않습니다.")
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="요청 형식이 올바르지 않습니다.")
+
+    action = str(body.get("action") or "")
+    username = resolve_alias(list(accounts.keys()), str(body.get("account") or ""))
+    account = accounts.get(username) if username else None
+    if account is None or not account.enabled:
+        raise HTTPException(status_code=404, detail="계정을 찾을 수 없습니다.")
+    try:
+        label, _amount = action_label(action)
+        if action in LOTTO_ACTIONS:
+            if not config["enable_lotto645"] or not account.lotto_645:
+                raise DashboardInputError("로또 기능이 꺼져 있거나 로그인되지 않았습니다.")
+            if not is_purchase_available_now():
+                raise DashboardInputError("지금은 로또 구매 불가 시간입니다 (토 20:00 ~ 일 06:00).")
+        elif not config.get("enable_pension720", True) or not account.pension:
+            raise DashboardInputError("연금복권 기능이 꺼져 있습니다.")
+        if action == "lotto_manual":
+            value = normalize_lotto_manual(body.get("numbers"))
+            account.manual_numbers_state = value
+            _sync_manual_text(username, "manual_numbers", value)
+        elif action == "pension_manual":
+            value = normalize_pension_manual(body.get("group"), body.get("digits"))
+            account.pension_manual_state = value
+            _sync_manual_text(username, "pension_manual", value)
+    except DashboardInputError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if account.last_action and account.last_action.get("status") == "running":
+        raise HTTPException(status_code=409, detail="이 계정의 이전 구매가 아직 진행 중입니다.")
+
+    ha_user = request.headers.get("X-Remote-User-Name") or "?"
+    logger.info(f"[DASH][{mask_username(username)}] 구매 요청: {action} (HA 사용자: {ha_user})")
+    # 진행 중 표시를 먼저 기록해 연속 클릭(409)을 즉시 막는다.
+    account.last_action = {"action": action, "label": label, "status": "running", "message": "",
+                           "started": time.time(), "finished": None}
+    task = asyncio.create_task(_run_dashboard_action(account, action, label))
+    _dashboard_tasks.add(task)
+    task.add_done_callback(_dashboard_tasks.discard)
+    return JSONResponse({"accepted": True, "action": action, "label": label}, status_code=202, headers=_SECURITY_HEADERS)
 
 
 @app.get("/api/ingress")
@@ -2032,11 +2277,12 @@ async def health(request: Request):
     accounts_status = {}
     logged_in_count = 0
 
+    aliases = _aliases()
     for username, account in accounts.items():
         is_logged_in = bool(account.client and getattr(account.client, "logged_in", False))
         if is_logged_in:
             logged_in_count += 1
-        accounts_status[username] = {
+        accounts_status[aliases[username][1]] = {
             "logged_in": is_logged_in,
             "enabled": account.enabled,
             "status": "✅ Active" if is_logged_in else "❌ Login Failed",
@@ -2047,7 +2293,7 @@ async def health(request: Request):
 
     return {
         "status": status,
-        "version": "2.4.11",
+        "version": APP_VERSION,
         "ingress": is_ingress_request(request),
         "accounts": accounts_status,
         "total_accounts": len(accounts),
@@ -2065,9 +2311,10 @@ async def health(request: Request):
 async def list_accounts():
     """List accounts"""
     result = []
+    aliases = _aliases()
     for username, account in accounts.items():
         result.append({
-            "username": username,
+            "account": aliases[username][1],  # 실제 아이디 대신 Account_N
             "enabled": account.enabled,
             "logged_in": account.client.logged_in if account.client else False,
         })

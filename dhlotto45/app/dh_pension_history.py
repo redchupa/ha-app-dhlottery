@@ -87,3 +87,40 @@ def summarize(round_no: int, games, win_count: int, total_win: int) -> str:
     if win_count > 0:
         return f"{round_no}회 {len(games)}매 중 당첨 {win_count}매 · {total_win:,}원"
     return f"{round_no}회 {len(games)}매 모두 낙첨"
+
+
+def select_rounds(rounds, latest_drawn: int):
+    """현재(판매 중) 회차와 이전(추첨 완료) 회차 번호를 고른다. 반환: (current, prev).
+
+    로또 센서와 같은 기준:
+    - current = 최신 추첨 회차 + 1 (지금 판매 중인 회차). 구매가 없어도 이 번호를 쓴다.
+    - prev    = 최신 추첨 회차 이하에서 구매가 있는 가장 최근 회차(없으면 0).
+    latest_drawn 을 모르면(0) 구매 회차 순서로 대체한다(가장 최근=current, 그 이전=prev).
+    """
+    keys = sorted((r for r in (rounds or {}) if r > 0), reverse=True)
+    latest = _safe_int(latest_drawn)
+    if latest <= 0:
+        current = keys[0] if keys else 0
+        prev = keys[1] if len(keys) > 1 else 0
+        return current, prev
+    current = latest + 1
+    prev = next((r for r in keys if r <= latest), 0)
+    return current, prev
+
+
+def result_style(result) -> tuple:
+    """연금 당첨결과 문자열 → (icon, color). 대시보드·센서 아이콘용."""
+    r = (str(result or "")).strip()
+    if r in NOT_DRAWN:
+        return "mdi:clock-outline", "grey"
+    if "낙첨" in r or "등외" in r:
+        return "mdi:close-circle-outline", "red"
+    if "1등" in r:
+        return "mdi:trophy", "gold"
+    if "2등" in r:
+        return "mdi:medal", "silver"
+    if "3등" in r:
+        return "mdi:medal-outline", "bronze"
+    if "보너스" in r or "당첨" in r or any(f"{n}등" in r for n in range(4, 8)):
+        return "mdi:cash", "green"
+    return "mdi:clock-outline", "grey"

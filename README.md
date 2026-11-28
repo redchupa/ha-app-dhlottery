@@ -44,6 +44,8 @@ Home Assistant에서 **동행복권 로또 6/45를 자동으로 구매하고 분
 - ✅ **MQTT Discovery**: HA 자동 통합
 - ✅ **REST API**: 외부 시스템 연동 + Swagger UI
 - ✅ **모바일 알림**: 구매 완료, 당첨번호 발표 알림
+- ✅ **사이드바 대시보드** (v2.5.0): 구매 내역 조회 + 구매 버튼을 HA 사이드바 한 화면에서
+- ✅ **아이디 비공개**: 웹 UI·API·애드온 로그에는 실제 아이디 대신 `Account_1`, `Account_2` 로 표시
 
 ---
 
@@ -51,6 +53,7 @@ Home Assistant에서 **동행복권 로또 6/45를 자동으로 구매하고 분
 
 - [실제 사용 화면](#실제-사용-화면)
 - [설치](#설치)
+- [사이드바 대시보드](#사이드바-대시보드)
 - [대시보드 카드 예시](#대시보드-카드-예시-2계정-기준)
 - [사용 전 필수 체크](#사용-전-필수-체크)
 - [다중 계정 사용 및 자동화 주의사항](#다중-계정-사용-및-자동화-주의사항)
@@ -101,6 +104,28 @@ mqtt_password: ""
 ```
 
 4. **Start** 클릭 → **Log** 탭에서 `Login successful` 확인
+
+---
+
+## 사이드바 대시보드
+
+v2.5.0 부터 애드온의 **웹 UI 가 대시보드**로 바뀌었습니다. 구매한 복권 조회와 구매를 한 화면에서 할 수 있습니다.
+
+**사이드바에 표시하기**: 설정 → 애드온(앱) → DH Lotto 45 → **사이드바에 표시** 켜기. 왼쪽 메뉴에 `DH Lotto 45` 가 생깁니다.
+
+| 카드 | 내용 |
+|---|---|
+| 계정 요약 | 예치금, 구매 가능 금액, 로그인·동기화 상태 |
+| 구매하기 | 로또 자동 1·5게임, 수동 1게임 / 연금복권 자동 1·5매, 수동 1매 (구매 전 확인 창) |
+| 로또 이번·지난 회차 | 구매 번호와 결과, 지난 회차 당첨번호 |
+| 연금복권 이번·지난 회차 | 구매한 조·번호와 결과, 당첨 요약 |
+| 최신 당첨번호 | 로또 6/45, 연금복권720+ |
+
+- 계정은 실제 아이디 대신 `Account_1`, `Account_2` … (애드온 설정 순서)로 표시됩니다.
+- 구매 버튼에도 기존 보호 장치(주간 5게임, 연금 1일 한도, 계정 간 20초 간격, 15초 중복 방지)가 그대로 적용됩니다.
+- 로또 구매 불가 시간(토 20:00 ~ 일 06:00)에는 로또 버튼이 잠깁니다.
+
+**보안**: 대시보드 데이터와 구매는 **HA 사이드바(Ingress)로 열었을 때만** 동작합니다. HA 로그인을 거친 요청만 통과하고, 포트 60099 로 직접 접속하면 차단됩니다. 구매 요청에는 페이지별 보안 토큰(CSRF)이 필요하며, 다른 사이트에서 사용자의 HA 세션으로 구매를 시도할 수 없도록 CORS 자격증명을 막았습니다. 화면은 CSP 로 보호됩니다.
 
 ---
 
@@ -1764,6 +1789,17 @@ cards:
 - `sensor.dhlotto_{username}_lotto45_purchase_history_count` — 구매 기록 수 (최근 1주)
 - `sensor.dhlotto_{username}_lotto45_game_1` ~ `game_5` — 구매한 게임별 번호
 
+#### 연금복권720+ 구매 내역 (v2.5.0)
+로또와 같은 기준으로 **현재(판매 중인 회차)** 와 **이전(추첨 완료 회차)** 을 나눕니다.
+
+- `sensor.dhlotto_{username}_pension720_game_1` ~ `game_5` — 현재 회차 구매 1~5매 (예: `1조 486449`)
+- `sensor.dhlotto_{username}_pension720_prev_game_1` ~ `prev_game_5` — 이전 회차 구매 1~5매와 결과
+- `sensor.dhlotto_{username}_pension720_this_round` — 현재 회차 구매 매수 (속성 `games` 에 전체 목록)
+- `sensor.dhlotto_{username}_pension720_last_round` — 이전 회차 구매 매수 (속성 `games`, `win_count`, `total_win_amount`, `result_summary`)
+
+`pension720_game_*` / `prev_game_*` 추가 속성: `round_no`, `group`, `number`, `result`, `rank`, `win_amount`, `color`, `total_in_round`
+한 회차에 5매를 넘게 사면 앞의 5매만 개별 센서로 나오고, 전체는 `this_round`/`last_round` 의 `games` 속성에 있습니다. 구매 직후 바로 갱신됩니다.
+
 #### `latest_purchase` 추가 속성
 `round_no`, `barcode`, `result`, `games`, `games_count`
 
@@ -1803,8 +1839,9 @@ MQTT Discovery를 활성화하면 자동 구매 버튼이 생성됩니다.
 **Base URL**: `http://homeassistant.local:60099`
 
 ### 조회 (GET)
-- `/health` — 상태 확인 (계정 상태, 최대 계정 수, 주간 한도, 계정 간 쿨다운 정책 포함)
-- `/accounts` — 등록된 계정 목록 및 로그인 상태
+- `/health` — 상태 확인 (계정 상태, 최대 계정 수, 주간 한도, 계정 간 쿨다운 정책 포함). 계정은 `Account_N` 으로 표시
+- `/accounts` — 등록된 계정 목록 및 로그인 상태 (`Account_N` 표시)
+- `/api/dashboard`, `POST /api/purchase` — 사이드바 대시보드 전용 (HA Ingress 경유만 허용)
 - `/api/ingress` — Home Assistant Ingress 경유 여부
 
 ### Swagger UI
