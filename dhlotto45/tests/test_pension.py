@@ -18,6 +18,8 @@ sys.path.insert(0, os.path.join(HERE, "..", "app"))
 from dh_pension_browser import (  # noqa: E402
     DhPensionBrowserError,
     classify_purchase_failure,
+    is_login_success_url,
+    validate_login_credentials,
     validate_manual_selection,
 )
 import dh_pension_history as H  # noqa: E402
@@ -60,6 +62,33 @@ for bad_g in (0, 6, -1, 99, "x", None, 1.5):
     expect_raise(lambda g=bad_g: validate_manual_selection(g, "123456"), f"조 거부 {bad_g!r}")
 for bad_d in ("12345", "1234567", "12a456", "", "abcdef", "12 456", None):
     expect_raise(lambda d=bad_d: validate_manual_selection(1, d), f"번호 거부 {bad_d!r}")
+
+# ------------------------------------------------ validate_login_credentials
+print("[validate_login_credentials]")
+check(validate_login_credentials("user01", "a" * 20) is None, "비밀번호 20자 허용")
+check(validate_login_credentials("user01", "p@ss!word#1") is None, "특수문자 허용")
+expect_raise(lambda: validate_login_credentials("user01", "a" * 21), "비밀번호 21자 거부")
+expect_raise(lambda: validate_login_credentials("user01", ""), "빈 비밀번호 거부")
+expect_raise(lambda: validate_login_credentials("user01", None), "None 비밀번호 거부")
+expect_raise(lambda: validate_login_credentials("", "pw"), "빈 아이디 거부")
+expect_raise(lambda: validate_login_credentials("  ", "pw"), "공백 아이디 거부")
+try:
+    validate_login_credentials("user01", "a" * 25)
+except DhPensionBrowserError as e:
+    check("25자" in str(e) and "20자" in str(e), "21자+ 메시지에 길이 안내")
+
+# ------------------------------------------------ is_login_success_url
+print("[is_login_success_url]")
+B = "https://www.dhlottery.co.kr"
+check(is_login_success_url(B + "/main") is True, "/main 성공")
+check(is_login_success_url(B + "/mypage/home") is True, "/mypage 성공")
+check(is_login_success_url(B + "/login/loginSuccess.do") is True, "loginSuccess.do 성공")
+check(is_login_success_url(B + "/mbrsrvc/ExpryPswdNoti") is True, "비번만료 안내 성공")
+check(is_login_success_url(B + "/login") is False, "/login 머무름 실패")
+check(is_login_success_url(B + "/login/securityLoginCheck.do") is False, "로그인체크 중 실패")
+check(is_login_success_url("about:blank") is False, "about:blank 실패")
+check(is_login_success_url("") is False, "빈 URL 실패")
+check(is_login_success_url(None) is False, "None URL 실패")
 
 # ------------------------------------------------ classify_purchase_failure
 print("[classify_purchase_failure]")

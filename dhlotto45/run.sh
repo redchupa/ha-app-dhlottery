@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bashio
 
-bashio::log.info "Starting Lotto 45 Add-on v2.4.8 (Multi-Account)..."
+bashio::log.info "Starting Lotto 45 Add-on v2.4.10 (Multi-Account)..."
 
 # Build accounts JSON array properly (최대 4계정 제한)
 MAX_ACCOUNTS=4

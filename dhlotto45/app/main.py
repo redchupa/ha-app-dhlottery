@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.4.3
+Lotto 45 Add-on Main Application v2.4.10
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -962,7 +962,7 @@ async def lifespan(app: FastAPI):
     """Lifecycle"""
     global event_loop
     
-    logger.info("Starting v2.4.3 Multi-Account...")
+    logger.info("Starting v2.4.10 Multi-Account...")
     
     event_loop = asyncio.get_running_loop()
     await init_clients()
@@ -985,7 +985,7 @@ async def lifespan(app: FastAPI):
     await cleanup_clients()
 
 
-app = FastAPI(title="Lotto 45 Multi", version="2.4.3", lifespan=lifespan)
+app = FastAPI(title="Lotto 45 Multi", version="2.4.10", lifespan=lifespan)
 
 # CORS: 모바일 앱 및 외부/Ingress 접근 지원
 app.add_middleware(
@@ -1999,14 +1999,14 @@ async def root(request: Request):
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Lotto 45 v2.4.3</title>
+            <title>Lotto 45 v2.4.10</title>
             <style>
                 body {{ font-family: Arial; margin: 40px; }}
                 .info {{ background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }}
             </style>
         </head>
         <body>
-            <h1>🎰 Lotto 45 <span style="color:#666;">v2.4.3 Multi-Account</span> {ingress_badge}</h1>
+            <h1>🎰 Lotto 45 <span style="color:#666;">v2.4.10 Multi-Account</span> {ingress_badge}</h1>
             <div class="info">
                 <h2>Accounts ({len(accounts)})</h2>
                 {accounts_html}
@@ -2047,7 +2047,7 @@ async def health(request: Request):
 
     return {
         "status": status,
-        "version": "2.4.3",
+        "version": "2.4.10",
         "ingress": is_ingress_request(request),
         "accounts": accounts_status,
         "total_accounts": len(accounts),

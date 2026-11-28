@@ -54,6 +54,48 @@ LOGIN_BTN_SELECTORS = (
 PENSION_PRICE = 1000  # 1매 1,000원
 MAX_COUNT = 5
 
+# 동행복권 로그인 페이지의 비밀번호 입력란은 maxlength="20" 이다. 브라우저 입력은
+# 20자에서 잘려 로그인이 실패하므로(HTTP 로그인=로또는 전체를 보내 성공) 미리 막는다.
+LOGIN_PW_MAXLEN = 20
+
+# 로그인 버튼(login())은 RSA 공개키(rsa.n)가 AJAX 로 설정된 뒤에만 동작한다.
+# 키가 없으면 rsa.encrypt() 가 TypeError 로 죽고 폼이 조용히 제출되지 않는다.
+RSA_READY_JS = "(() => typeof rsa !== 'undefined' && !!rsa && rsa.n != null)()"
+
+
+def validate_login_credentials(username, password):
+    """브라우저 로그인 전 계정 값 검사(순수 함수). 문제가 있으면 DhPensionBrowserError.
+
+    로그인 시도 자체를 하지 않으므로 실패 횟수(5회 잠금)를 소모하지 않는다.
+    """
+    if not str(username or "").strip():
+        raise DhPensionBrowserError("로그인 실패: 아이디가 비어 있습니다")
+    pw = password or ""
+    if not pw:
+        raise DhPensionBrowserError("로그인 실패: 비밀번호가 비어 있습니다")
+    if len(pw) > LOGIN_PW_MAXLEN:
+        raise DhPensionBrowserError(
+            f"로그인 실패: 비밀번호가 {len(pw)}자입니다. 동행복권 웹 로그인 입력란은 "
+            f"최대 {LOGIN_PW_MAXLEN}자까지만 받아 연금복권(브라우저 로그인)은 로그인할 수 "
+            f"없습니다(로또는 다른 방식이라 동작). 동행복권 사이트에서 비밀번호를 "
+            f"{LOGIN_PW_MAXLEN}자 이하로 변경한 뒤 애드온 설정도 바꿔 주세요."
+        )
+
+
+def is_login_success_url(url):
+    """로그인 버튼 클릭 후 URL 로 성공 여부 판정(순수 함수).
+
+    성공 시 /login/securityLoginCheck.do → /login/loginSuccess.do → /main 순으로 이동한다.
+    loginSuccess.do 는 /login 경로 아래라 그 시점에도 성공으로 본다.
+    비밀번호 만료 안내(/mbrsrvc/ExpryPswdNoti)도 인증은 성공한 상태다.
+    """
+    u = url or ""
+    if not u or u.startswith("about:"):
+        return False
+    if "loginSuccess.do" in u or "ExpryPswdNoti" in u:
+        return True
+    return "/login" not in u
+
 
 def validate_manual_selection(group, digits):
     """수동 선택값 유효성 검사 → (group:int, digits:str) 로 정규화.
@@ -231,6 +273,8 @@ class DhPensionBrowser:
         자동구매·수동구매·진단이 모두 이 경로를 공유한다. work(tab) 의 반환값을
         그대로 돌려준다.
         """
+        # 브라우저를 띄우기 전에 계정 값부터 검사(로그인 실패 횟수 소모 방지)
+        validate_login_credentials(self.username, self.password)
         try:
             import zendriver as zd  # 지연 import: 미설치 시 애드온 전체가 죽지 않도록
             import zendriver.cdp.fetch as cdp_fetch
@@ -465,6 +509,7 @@ class DhPensionBrowser:
 
     async def _login(self, tab) -> None:
         self._log.info("[PENSION-BR] 로그인 페이지 이동")
+        t0 = time.monotonic()
         await tab.get(self.login_url)
 
         # 폼이 렌더될 때까지 대기(페이지 로딩/late JS 대응). query_selector 는
@@ -482,25 +527,113 @@ class DhPensionBrowser:
                 f"로그인 입력란(비밀번호)을 찾지 못했습니다. {diag}"
             )
 
+        # RSA 공개키가 준비되기 전에 클릭하면 login() 이 조용히 실패한다(느린 기기·망).
+        await self._ensure_rsa_ready(tab)
+
+        # 아이디 저장 쿠키 등으로 미리 채워진 값이 있으면 뒤에 덧붙지 않도록 비운다.
+        await self._safe_eval(
+            tab,
+            "(() => { document.querySelectorAll(\"#inpUserId, input[type='password']\")"
+            ".forEach(e => { e.value = ''; }); return true; })()",
+        )
         await id_el.send_keys(self.username)
         await pw_el.send_keys(self.password)
+
+        # 입력값이 실제로 들어갔는지 확인(키 이벤트 누락·maxlength 잘림 감지).
+        # JS value.length 는 UTF-16 단위라 같은 기준으로 비교한다.
+        typed = await self._safe_eval(
+            tab,
+            "(() => { const i = document.querySelector('#inpUserId'); "
+            "const p = document.querySelector('#inpUserPswdEncn') || "
+            "document.querySelector(\"input[type='password']\"); "
+            "return JSON.stringify({id: i ? i.value.length : -1, "
+            "pw: p ? p.value.length : -1}); })()",
+        )
+        try:
+            lens = json.loads(typed) if isinstance(typed, str) else {}
+        except ValueError:
+            lens = {}
+        exp_id = len(self.username.encode("utf-16-le")) // 2
+        exp_pw = len(self.password.encode("utf-16-le")) // 2
+        got_id = lens.get("id", -1) if isinstance(lens, dict) else -1
+        got_pw = lens.get("pw", -1) if isinstance(lens, dict) else -1
+        # -1 = 필드를 못 찾음(사이트 구조 변경) → 이 검사만 건너뛰고 기존 흐름 유지
+        if (got_id >= 0 and got_id != exp_id) or (got_pw >= 0 and got_pw != exp_pw):
+            raise DhPensionBrowserError(
+                "로그인 실패: 입력란에 아이디/비밀번호가 정상 입력되지 않았습니다 "
+                f"(입력된 길이 id={got_id}/{exp_id}, pw={got_pw}/{exp_pw}). "
+                "아이디는 영문·숫자만 허용되고, 비밀번호는 20자 이하여야 합니다."
+            )
 
         btn = await self._wait_first(tab, LOGIN_BTN_SELECTORS, 5.0)
         if btn is None:
             raise DhPensionBrowserError("로그인 버튼을 찾지 못했습니다")
         await btn.click()
 
-        # 로그인 성공 시 /login 을 벗어난다(실패 시 알림 후 그대로 머무름).
-        ok = await self._wait_js(
-            tab,
-            "(() => !location.href.includes('/login'))()",
-            timeout=20.0,
-        )
+        # 로그인 성공 시 /login 을 벗어나거나 loginSuccess.do 에 도달한다
+        # (실패 시 오류 안내와 함께 /login 에 머무름). 느린 기기를 고려해 넉넉히 대기.
+        deadline = time.monotonic() + max(30.0, self.nav_timeout)
+        ok = False
+        while time.monotonic() < deadline:
+            href = await self._safe_eval(tab, "location.href") or ""
+            if is_login_success_url(href):
+                ok = True
+                break
+            await asyncio.sleep(0.3)
         if not ok:
+            reason = await self._login_failure_reason(tab)
             raise DhPensionBrowserError(
-                "로그인 실패: 아이디/비밀번호 또는 추가 인증(캡차)을 확인하세요"
+                "로그인 실패: 아이디/비밀번호 또는 추가 인증(캡차)을 확인하세요. "
+                f"{reason}"
             )
-        self._log.info("[PENSION-BR] 로그인 성공")
+        self._log.info(
+            f"[PENSION-BR] 로그인 성공 ({time.monotonic() - t0:.1f}s)"
+        )
+
+    async def _ensure_rsa_ready(self, tab) -> None:
+        """로그인 페이지의 RSA 공개키(rsa.n) 설정 완료를 기다린다.
+
+        10초 안에 안 되면 페이지의 selectRsaModulus() 를 한 번 더 호출하고 다시 기다린다.
+        """
+        if await self._wait_js(tab, RSA_READY_JS, timeout=10.0):
+            return
+        self._log.warning("[PENSION-BR] RSA 공개키 미준비 → selectRsaModulus() 재요청")
+        await self._safe_eval(
+            tab,
+            "(() => { if (typeof selectRsaModulus === 'function') "
+            "{ selectRsaModulus(); return true; } return false; })()",
+        )
+        if await self._wait_js(tab, RSA_READY_JS, timeout=max(15.0, self.nav_timeout)):
+            return
+        diag = await self._page_diag(tab)
+        raise DhPensionBrowserError(
+            "로그인 실패: 로그인 보안키(RSA)를 받지 못했습니다. 네트워크가 느리거나 "
+            f"동행복권 사이트 응답이 지연되고 있습니다. 잠시 후 재시도하세요. {diag}"
+        )
+
+    async def _login_failure_reason(self, tab) -> str:
+        """로그인 실패 시 사이트가 보여준 사유(알림 모달·서버 오류문구)와 URL 을 수집."""
+        js = r"""
+        (() => {
+          let serverMsg = '';
+          const m = (document.documentElement.innerHTML || '')
+            .match(/const\s+errorMessage\s*=\s*'([^']*)'/);
+          if (m) serverMsg = m[1];
+          const modals = Array.from(document.querySelectorAll(
+              '[class*="alert"],[class*="modal"],[class*="popup"],[class*="layer"],[role="dialog"]'))
+            .filter(e => e.offsetParent !== null)
+            .map(e => (e.innerText || '').replace(/\s+/g, ' ').trim())
+            .filter(t => t && t.length < 300);
+          return JSON.stringify({url: location.href, serverMsg, modals: modals.slice(0, 3)});
+        })()
+        """
+        info = await self._safe_eval(tab, js)
+        dialogs = [m for m in getattr(self, "_dialog_msgs", []) if m][-3:]
+        reason = f"사이트응답={info}"
+        if dialogs:
+            reason += f" 알림={dialogs}"
+        self._log.warning(f"[PENSION-BR] 로그인 실패 상세: {reason}")
+        return reason
 
     async def _purchase(self, tab, count: int) -> list:
         self._log.info(f"[PENSION-BR] 구매 페이지 이동: {self.game_url}")
