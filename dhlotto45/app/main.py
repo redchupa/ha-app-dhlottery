@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.6.2
+Lotto 45 Add-on Main Application v2.7.0
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from dh_lottery_client import DhLotteryClient, DhLotteryError, DhLotteryLoginError
+import features as FT
 from dh_lotto_645 import DhLotto645, DhLotto645SelMode, DhLotto645Error, _rank_drawed_to_result
 from dh_lotto_analyzer import DhLottoAnalyzer
 from dh_mobile_api import DhMobileApiClient, DhMobileApiError
@@ -86,6 +87,10 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
+# 진단 리포트용 최근 로그(메모리만, 아이디 별칭 필터가 같이 걸린다)
+_ring_log = FT.RingLogHandler(300)
+_ring_log.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logging.getLogger().addHandler(_ring_log)
 
 # Account data structure
 class AccountData:
@@ -108,7 +113,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.6.2"
+APP_VERSION = "2.7.0"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -407,26 +412,26 @@ def on_button_command(client_mqtt, userdata, message):
         # 연금복권 수동 구매 (조,번호 입력값 사용) — 반드시 auto 분기보다 먼저 처리
         if button_suffix == "buy_pension_manual":
             if event_loop and event_loop.is_running():
-                asyncio.run_coroutine_threadsafe(
-                    execute_pension_manual_purchase(account), event_loop
-                )
+                event_loop.call_soon_threadsafe(_start_action, account, "pension_manual", "button")
             return
 
         # 연금복권 자동 구매 버튼 라우팅 (buy_pension_auto_1 / buy_pension_auto_5)
         if button_suffix.startswith("buy_pension"):
-            pension_count = 5 if button_suffix.endswith("_5") else 1
+            pension_action = "pension_auto_5" if button_suffix.endswith("_5") else "pension_auto_1"
             if event_loop and event_loop.is_running():
-                asyncio.run_coroutine_threadsafe(
-                    execute_pension_purchase(account, pension_count),
-                    event_loop
-                )
+                event_loop.call_soon_threadsafe(_start_action, account, pension_action, "button")
             return
 
+        lotto_action = {"buy_auto_1": "lotto_auto_1", "buy_auto_5": "lotto_auto_5",
+                        "buy_manual": "lotto_manual"}.get(button_suffix)
         if event_loop and event_loop.is_running():
-            asyncio.run_coroutine_threadsafe(
-                execute_button_purchase(account, button_suffix),
-                event_loop
-            )
+            if lotto_action:
+                event_loop.call_soon_threadsafe(_start_action, account, lotto_action, "button")
+            else:
+                asyncio.run_coroutine_threadsafe(
+                    execute_button_purchase(account, button_suffix),
+                    event_loop
+                )
 
     except Exception as e:
         logger.error(f"[MQTT] Error: {e}", exc_info=True)
@@ -1036,6 +1041,7 @@ async def lifespan(app: FastAPI):
             account.update_task = task
             tasks.append(task)
     
+    tasks.append(asyncio.create_task(auto_buy_loop()))
     logger.info("Started")
     
     yield
@@ -2054,6 +2060,8 @@ async def publish_sensor_for_account(account: AccountData, entity_id: str, state
         "attributes": attributes or {},
         "ts": time.time(),
     }
+    # 원장(구매·당첨 기록)·당첨/예치금 알림
+    _observe_sensor(account, entity_id, state, attributes or {})
 
     if config["use_mqtt"] and mqtt_client and mqtt_client.connected:
         try:
@@ -2268,8 +2276,11 @@ def _sync_manual_text(username: str, text_id: str, value: str) -> None:
             logger.warning(f"[DASH] 수동 번호 MQTT 동기화 실패: {e}")
 
 
-async def _run_dashboard_action(account: AccountData, action: str, label: str) -> None:
-    """대시보드 구매 작업 실행 → account.last_action 에 결과 기록."""
+async def _run_dashboard_action(account: AccountData, action: str, label: str, source: str = "dashboard") -> None:
+    """구매 작업 실행(대시보드·MQTT 버튼·정기 자동 구매 공용) → account.last_action 에 결과 기록.
+
+    끝나면 HA 이벤트(dhlotto45_purchase)와 구매 알림을 보낸다.
+    """
     started = time.time()
     account.last_action = {"action": action, "label": label, "status": "running", "message": "", "started": started, "finished": None}
     try:
@@ -2292,7 +2303,22 @@ async def _run_dashboard_action(account: AccountData, action: str, label: str) -
         "action": action, "label": label, "status": status, "message": message,
         "started": started, "finished": time.time(),
     }
-    logger.info(f"[DASH][{mask_username(account.username)}] {action} → {status}: {message[:120]}")
+    logger.info(f"[DASH][{mask_username(account.username)}] {action} → {status}: {message[:120]} ({source})")
+    _spawn(_after_purchase(_alias_of(account.username)[1], action, label, status, message, source))
+
+
+def _start_action(account: AccountData, action: str, source: str):
+    """구매 작업을 백그라운드로 시작. 같은 계정 작업이 진행 중이면 None."""
+    if account.last_action and account.last_action.get("status") == "running":
+        logger.warning(f"[DASH][{mask_username(account.username)}] {action} 건너뜀: 이전 구매 진행 중 ({source})")
+        return None
+    label, _amount = action_label(action)
+    account.last_action = {"action": action, "label": label, "status": "running", "message": "",
+                           "started": time.time(), "finished": None}
+    task = asyncio.create_task(_run_dashboard_action(account, action, label, source))
+    _dashboard_tasks.add(task)
+    task.add_done_callback(_dashboard_tasks.discard)
+    return task
 
 
 @app.post("/api/purchase")
@@ -2345,6 +2371,388 @@ async def api_purchase(request: Request):
     _dashboard_tasks.add(task)
     task.add_done_callback(_dashboard_tasks.discard)
     return JSONResponse({"accepted": True, "action": action, "label": label}, status_code=202, headers=_SECURITY_HEADERS)
+
+
+# ================================================================ v2.7.0 확장 기능
+# 알림·HA 이벤트, 구매/당첨 원장(통계), 즐겨찾기·정기 자동 구매 설정, 진단 리포트.
+_feature_lock = asyncio.Lock()
+_ledger: Optional["FT.Ledger"] = None
+_feature_state: Optional[dict] = None
+_bg_tasks: set = set()
+
+
+def _data_path(name: str) -> str:
+    return os.path.join(DATA_DIR, name)
+
+
+def _read_json(name: str, default):
+    import json as _json
+    try:
+        with open(_data_path(name), encoding="utf-8") as f:
+            return _json.load(f)
+    except FileNotFoundError:
+        return default
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[FEAT] {name} 읽기 실패(기본값 사용): {e}")
+        return default
+
+
+def _write_json(name: str, obj) -> None:
+    """원자적 저장(임시파일 → replace)."""
+    import json as _json
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = _data_path(name) + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(obj, f, ensure_ascii=False)
+    os.replace(tmp, _data_path(name))
+
+
+def _load_settings() -> dict:
+    return FT.normalize_settings(_read_json(FT.SETTINGS_FILE, {}))
+
+
+def _get_ledger() -> "FT.Ledger":
+    global _ledger
+    if _ledger is None:
+        raw = _read_json(FT.LEDGER_FILE, [])
+        _ledger = FT.Ledger(raw if isinstance(raw, list) else [])
+    return _ledger
+
+
+def _state() -> dict:
+    global _feature_state
+    if _feature_state is None:
+        raw = _read_json(FT.STATE_FILE, {})
+        _feature_state = raw if isinstance(raw, dict) else {}
+    return _feature_state
+
+
+def _save_state() -> None:
+    try:
+        _write_json(FT.STATE_FILE, _state())
+    except OSError as e:
+        logger.warning(f"[FEAT] 상태 저장 실패: {e}")
+
+
+def _spawn(coro) -> None:
+    task = asyncio.create_task(coro)
+    _bg_tasks.add(task)
+    task.add_done_callback(_bg_tasks.discard)
+
+
+def _alias_of(username: str) -> tuple:
+    return _aliases().get(username, ("account_0", "Account_?"))
+
+
+def _observe_sensor(account: AccountData, entity_id: str, state, attributes: dict) -> None:
+    """센서 발행마다 호출: 구매·당첨을 원장에 기록하고 새 당첨·예치금 부족을 알린다."""
+    try:
+        aid, label = _alias_of(account.username)
+        items = FT.ledger_items_from_sensor(
+            aid, entity_id, state, attributes, FT.lotto_prizes_from_cache(account.sensor_cache)
+        )
+        if items:
+            led, now, new_wins, changed = _get_ledger(), FT.now_kst(), [], False
+            for it in items:
+                if led.add(aid, it, now):
+                    changed = True
+                    if it["kind"] == "win":
+                        new_wins.append(it)
+            if changed:
+                try:
+                    _write_json(FT.LEDGER_FILE, led.entries)
+                except OSError as e:
+                    logger.warning(f"[FEAT] 원장 저장 실패: {e}")
+            for it in new_wins:
+                logger.info(f"[WIN][{label}] {it['game']} {it['round']}회 {it['info']} {it['amount']:,}원")
+                _spawn(_notify_win(label, it))
+        if entity_id == "lotto45_balance":
+            _spawn(_check_low_deposit(aid, label, state))
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"[FEAT] 센서 관찰 실패: {e}")
+
+
+async def _ha_post(path: str, payload: dict) -> bool:
+    """HA Core API 호출(Supervisor 토큰). 실패해도 예외를 내지 않는다."""
+    if not config["supervisor_token"]:
+        return False
+    import aiohttp
+    url = f"{config['ha_url']}/api/{path}"
+    headers = {"Authorization": f"Bearer {config['supervisor_token']}", "Content-Type": "application/json"}
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+            async with session.post(url, json=payload, headers=headers) as resp:
+                if resp.status >= 300:
+                    logger.warning(f"[NOTIFY] {path} 실패: HTTP {resp.status}")
+                    return False
+                return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[NOTIFY] {path} 실패: {e}")
+        return False
+
+
+def _notification_id(tag: str) -> str:
+    import re as _re
+    return _re.sub(r"[^a-z0-9_]", "_", tag.lower())[:120]
+
+
+async def notify_user(title: str, message: str, tag: str = "dhlotto45") -> bool:
+    """설정에 따라 HA 알림(persistent_notification)과 추가 notify 서비스로 보낸다."""
+    n = _load_settings()["notify"]
+    ok = False
+    if n["persistent"]:
+        ok = await _ha_post("services/persistent_notification/create",
+                            {"title": title, "message": message, "notification_id": _notification_id(tag)}) or ok
+    if n["service"]:
+        ok = await _ha_post("services/notify/" + n["service"].split(".", 1)[1],
+                            {"title": title, "message": message}) or ok
+    return ok
+
+
+async def fire_event(event_type: str, data: dict) -> None:
+    """자동화용 HA 이벤트. 계정은 별칭(Account_N)만 담는다."""
+    await _ha_post(f"events/{event_type}", data)
+
+
+async def _notify_win(label: str, item: dict) -> None:
+    await fire_event("dhlotto45_win", {"account": label, "game": item["game"], "round": item["round"],
+                                       "result": item["info"], "amount": item["amount"]})
+    if _load_settings()["notify"]["win"]:
+        title, msg = FT.win_message(label, item)
+        await notify_user(title, msg, f"dhlotto45_win_{item['key']}")
+
+
+async def _check_low_deposit(aid: str, label: str, balance) -> None:
+    n = _load_settings()["notify"]
+    thr = n["low_deposit_threshold"]
+    if not n["low_deposit"]:
+        return
+    st = _state()
+    key = f"low_deposit:{aid}"
+    today = FT.now_kst().date().isoformat()
+    if not FT.needs_low_deposit_alert(balance, thr, today, st.get(key)):
+        return
+    st[key] = today
+    _save_state()
+    bal = int(float(balance))
+    await fire_event("dhlotto45_low_deposit", {"account": label, "balance": bal, "threshold": thr})
+    await notify_user(f"💸 예치금 부족 ({label})",
+                      f"예치금 {bal:,}원 — 알림 기준 {thr:,}원보다 적습니다. 구매 전에 충전하세요.",
+                      f"dhlotto45_low_{aid}")
+
+
+async def _after_purchase(acc_label: str, action: str, label: str, status: str, message: str, source: str) -> None:
+    await fire_event("dhlotto45_purchase", {"account": acc_label, "action": action, "label": label,
+                                            "status": status, "message": message[:200], "source": source})
+    if _load_settings()["notify"]["purchase"]:
+        title, msg = FT.purchase_message(acc_label, label, status, message[:200], source)
+        await notify_user(title, msg, f"dhlotto45_purchase_{acc_label}")
+
+
+# ---------------------------------------------------------------- 정기 자동 구매
+def _auto_buy_block_reason(account: Optional[AccountData], action: str, amount: int) -> str:
+    """자동 구매 전 추가 안전 점검. 막아야 하면 사유 문자열.
+
+    주간 5게임·연금 하루 한도·계정 간 20초·15초 중복 방지는 구매 함수가 그대로 검사한다.
+    """
+    if account is None or not account.enabled:
+        return "계정이 없거나 꺼져 있습니다"
+    if account.last_action and account.last_action.get("status") == "running":
+        return "다른 구매가 진행 중입니다"
+    if action.startswith("lotto"):
+        if not account.lotto_645 or not (account.client and account.client.logged_in):
+            return "로또 로그인이 되어 있지 않습니다"
+        if not is_purchase_available_now():
+            return "로또 판매 시간이 아닙니다 (토 20:00 ~ 일 06:00)"
+    elif not account.pension:
+        return "연금복권 구매를 쓸 수 없습니다 (chromium 미설치 기기)"
+    avail = (account.sensor_cache.get("lotto45_balance") or {}).get("attributes", {}).get("purchase_available")
+    try:
+        if avail is not None and int(float(avail)) < amount:
+            return f"예치금이 부족합니다 (구매 가능 {int(float(avail)):,}원, 필요 {amount:,}원)"
+    except (TypeError, ValueError):
+        pass
+    return ""
+
+
+async def _auto_buy_tick() -> None:
+    settings = _load_settings()
+    if not settings["auto_buy"]["enabled"]:
+        return
+    now = FT.now_kst()
+    st = _state()
+    done = st.get("auto_done") if isinstance(st.get("auto_done"), dict) else {}
+    due = FT.due_schedules(settings, now, done)
+    if not due:
+        return
+    aliases = _aliases()
+    order = [aliases[u][0] for u in accounts]
+    for sch, key in due:
+        # 실행 전에 먼저 기록: 도중에 재시작돼도 같은 날 두 번 사지 않는다.
+        done[key] = int(time.time())
+        st["auto_done"] = FT.prune_done(done, now.date())
+        _save_state()
+        label, amount = action_label(sch["action"])
+        targets = FT.schedule_targets(sch, order)
+        logger.info(f"[AUTO] 일정 {sch['name'] or sch['id']} 실행: {label} → {', '.join(targets) or '대상 없음'}")
+        for i, aid in enumerate(targets):
+            username = resolve_alias(list(accounts.keys()), aid)
+            account = accounts.get(username) if username else None
+            acc_label = _alias_of(username)[1] if username else aid
+            reason = _auto_buy_block_reason(account, sch["action"], amount)
+            if reason:
+                logger.warning(f"[AUTO][{acc_label}] {label} 건너뜀: {reason}")
+                await _after_purchase(acc_label, sch["action"], label, "skipped", reason, "schedule")
+                continue
+            task = _start_action(account, sch["action"], "schedule")
+            if task is not None:
+                await task
+            if i < len(targets) - 1:
+                await asyncio.sleep(INTER_ACCOUNT_COOLDOWN_SECONDS + 5)
+
+
+async def auto_buy_loop() -> None:
+    """30초마다 정기 자동 구매 일정을 확인한다(마스터 스위치가 켜졌을 때만 동작)."""
+    await asyncio.sleep(20)
+    while True:
+        try:
+            await _auto_buy_tick()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"[AUTO] 일정 처리 오류: {e}", exc_info=True)
+        await asyncio.sleep(30)
+
+
+# ---------------------------------------------------------------- API
+async def _read_json_body(request: Request, limit: int) -> dict:
+    raw = await request.body()
+    if len(raw) > limit:
+        raise HTTPException(status_code=413, detail="데이터가 너무 큽니다.")
+    import json as _json
+    try:
+        body = _json.loads(raw or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="요청 형식이 올바르지 않습니다.")
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="요청 형식이 올바르지 않습니다.")
+    return body
+
+
+def _require_csrf(request: Request) -> None:
+    if not csrf_ok(DASHBOARD_CSRF_TOKEN, request.headers.get(CSRF_HEADER)):
+        raise HTTPException(status_code=403, detail="보안 토큰이 올바르지 않습니다. 페이지를 새로고침하세요.")
+
+
+@app.get("/api/settings")
+async def api_get_settings(request: Request):
+    """알림·즐겨찾기·정기 자동 구매 설정."""
+    _require_ingress(request)
+    return JSONResponse(_load_settings(), headers=_SECURITY_HEADERS)
+
+
+@app.put("/api/settings")
+async def api_put_settings(request: Request):
+    """설정 부분 변경. Ingress 전용 + CSRF 필수, 값은 허용 목록으로 정규화."""
+    _require_ingress(request)
+    _require_csrf(request)
+    change = await _read_json_body(request, FT.SETTINGS_MAX_BODY)
+    async with _feature_lock:
+        before = _load_settings()
+        settings = FT.merge_settings(before, change)
+        try:
+            _write_json(FT.SETTINGS_FILE, settings)
+        except OSError as e:
+            logger.error(f"[FEAT] 설정 저장 실패: {e}")
+            raise HTTPException(status_code=500, detail="설정을 저장하지 못했습니다.")
+    if before["auto_buy"]["enabled"] != settings["auto_buy"]["enabled"]:
+        ha_user = request.headers.get("X-Remote-User-Name") or "?"
+        logger.warning(f"[AUTO] 정기 자동 구매 {'켜짐' if settings['auto_buy']['enabled'] else '꺼짐'} "
+                       f"(일정 {len(settings['auto_buy']['schedules'])}개, HA 사용자: {ha_user})")
+    return JSONResponse(settings, headers=_SECURITY_HEADERS)
+
+
+@app.get("/api/stats")
+async def api_stats(request: Request, account: str = ""):
+    """구매·당첨 통계(애드온이 본 기록 기준, 최근 12개월)."""
+    _require_ingress(request)
+    acct = account if (account.startswith("account_") and account[8:].isdigit() and len(account) <= 12) else ""
+    data = _get_ledger().stats(FT.now_kst(), 12, acct)
+    labels = {aid: lb for aid, lb in _aliases().values()}
+    data["labels"] = labels
+    return JSONResponse(data, headers=_SECURITY_HEADERS)
+
+
+@app.post("/api/notify-test")
+async def api_notify_test(request: Request):
+    """현재 알림 설정으로 테스트 알림 1건 보내기."""
+    _require_ingress(request)
+    _require_csrf(request)
+    ok = await notify_user("🔔 DH Lotto 45 테스트 알림", "알림 설정이 정상입니다.", "dhlotto45_test")
+    return JSONResponse({"ok": ok}, headers=_SECURITY_HEADERS)
+
+
+async def _chromium_version() -> str:
+    exe = os.getenv("CHROMIUM_PATH") or ""
+    if not exe:
+        return "없음"
+    try:
+        proc = await asyncio.create_subprocess_exec(exe, "--version", stdout=asyncio.subprocess.PIPE,
+                                                    stderr=asyncio.subprocess.DEVNULL)
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=8)
+        return out.decode(errors="replace").strip() or exe
+    except Exception as e:  # noqa: BLE001
+        return f"{exe} (버전 확인 실패: {type(e).__name__})"
+
+
+async def _build_diagnostics() -> str:
+    import platform
+    try:
+        from importlib.metadata import version as _ver
+        zd_ver = _ver("zendriver")
+    except Exception:  # noqa: BLE001
+        zd_ver = "미설치"
+    now = FT.now_kst()
+    lines = [
+        f"DH Lotto 45 v{APP_VERSION} 진단 리포트 · {now.strftime('%Y-%m-%d %H:%M')} KST",
+        f"- 기기: {platform.machine()} · Python {platform.python_version()}",
+        f"- zendriver {zd_ver} · chromium {await _chromium_version()}",
+        f"- MQTT: {'연결됨' if (mqtt_client and mqtt_client.connected) else '연결 안 됨'}",
+        f"- 로또 판매 시간: {'예' if is_purchase_available_now() else '아니오'}",
+    ]
+    s = _load_settings()
+    lines.append(f"- 정기 자동 구매: {'켜짐' if s['auto_buy']['enabled'] else '꺼짐'} · 일정 {len(s['auto_buy']['schedules'])}개"
+                 f" · 즐겨찾기 {len(s['favorites'])}개 · 추가 알림 서비스 {'있음' if s['notify']['service'] else '없음'}")
+    aliases = _aliases()
+    for username, account in accounts.items():
+        _aid, label = aliases[username]
+        c = account.sensor_cache
+        def sv(key):
+            return (c.get(key) or {}).get("state", "-")
+        la = account.last_action or {}
+        lines.append(
+            f"- {label}: 사용 {'예' if account.enabled else '아니오'} · 로그인 "
+            f"{'정상' if (account.client and account.client.logged_in) else '안 됨'} · 연금 구매 "
+            f"{'가능' if account.pension else '불가'} · 예치금 {sv('lotto45_balance')} · 동기화 {sv('lotto45_sync_status')}"
+        )
+        for key, nm in (("lotto45_login_error", "로그인 오류"), ("lotto45_purchase_error", "로또 오류"),
+                        ("pension720_purchase_error", "연금 오류")):
+            v = sv(key)
+            if v not in ("-", "없음", None):
+                lines.append(f"    {nm}: {v}")
+        if la:
+            lines.append(f"    마지막 구매: {la.get('label')} → {la.get('status')} {str(la.get('message') or '')[:160]}")
+    lines.append("")
+    lines.append("--- 최근 로그 ---")
+    lines.extend(_ring_log.tail(150))
+    return FT.scrub_text("\n".join(lines))
+
+
+@app.get("/api/diagnostics")
+async def api_diagnostics(request: Request):
+    """문의용 진단 리포트(아이디는 Account_N, IP·이메일·토큰은 가림)."""
+    _require_ingress(request)
+    return JSONResponse({"text": await _build_diagnostics()}, headers=_SECURITY_HEADERS)
 
 
 @app.get("/api/ingress")

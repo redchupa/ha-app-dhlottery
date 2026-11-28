@@ -1,5 +1,5 @@
 name: "DH Lotto 45"
-version: "2.6.2"
+version: "2.7.0"
 slug: "dhlotto45"
 description: "DH Lottery Lotto 6/45 Add-on with MQTT Discovery - Multi-Account Support"
 url: "https://github.com/redchupa/ha-app-dhlottery"

@@ -249,6 +249,31 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 .mini { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 2px 8px; cursor: pointer; }
 .mini:disabled { opacity: .35; cursor: default; }
 .saved { font-size: 12px; color: var(--muted); min-height: 18px; }
+.notice.ok { border-color: #8bd3a0; background: color-mix(in srgb, #8bd3a0 16%, var(--card)); }
+.btn.small { padding: 6px 10px; font-size: 13px; border-radius: 9px; }
+.row.fav .fname { min-width: 56px; max-width: 96px; font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ball.q { background: var(--chip); color: var(--muted); border: 1px dashed var(--line); box-shadow: none; }
+.genopts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; margin-top: 8px; }
+.genopts label { display: inline-flex; gap: 4px; align-items: center; background: var(--chip); border-radius: 8px; padding: 4px 8px; cursor: pointer; }
+.genopts select { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; }
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 120px; margin: 12px 0 4px; }
+.bcol { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; min-width: 0; }
+.bstack { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
+.sbar { width: 42%; min-height: 2px; border-radius: 4px 4px 0 0; }
+.sbar.spend { background: color-mix(in srgb, var(--ink) 38%, transparent); } .sbar.win { background: var(--gold); }
+.blbl { font-size: 10px; color: var(--muted); margin-top: 3px; }
+.legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.days { display: flex; gap: 4px; flex-wrap: wrap; }
+.days button { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 5px 9px; cursor: pointer; }
+.days button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.sched { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 10px; background: var(--chip); font-size: 13px; }
+.sched span { flex: 1; min-width: 0; }
+.sched.off span { opacity: .5; }
+.field.strong > span { font-weight: 800; }
+.manual input[type=time] { width: 110px; }
+textarea.diag { display: block; width: 100%; height: 240px; font-size: 11px; margin-top: 8px; background: var(--chip); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px; padding: 8px; resize: vertical; }
 footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px 16px 30px; }
 @media (max-width: 720px) { .hero { grid-template-columns: 1fr; } .hero-right { align-items: flex-start; } .hero-balls { justify-content: flex-start; } }
 @media (max-width: 420px) { .grid { grid-template-columns: 1fr; } .hero { padding: 18px; } .hero h2 { font-size: 20px; } .hero .ball { width: 34px; height: 34px; font-size: 13px; }
@@ -309,7 +334,23 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       density: "간격", comfortable: "넉넉하게", compact: "촘촘하게", ballStyle: "로또볼", glossy: "입체", flat: "평면",
       effects: "당첨 축하·애니메이션", showHero: "상단 행운 배너", luckyPh: "예: 이번 주는 내가 1등!", firstAcc: "첫 번째 계정",
       reset: "기본값으로", savedOk: "HA에 저장됨 · 모든 기기에 적용", saveFail: "저장 실패 (이 기기에만 적용됨)", close: "닫기",
-      gBasic: "기본", gLucky: "행운", gNight: "밤하늘 · 미래", up: "위로", down: "아래로", groupSuffix: "조" },
+      gBasic: "기본", gLucky: "행운", gNight: "밤하늘 · 미래", up: "위로", down: "아래로", groupSuffix: "조",
+      favorites: "즐겨찾기 번호", favEmpty: "저장한 번호가 없습니다. 아래에서 추가하세요.", favName: "이름(선택)", favAdd: "추가",
+      favBuy: "구매", favDel: "삭제", favLotto: "로또", favPension: "연금", favFromInput: "구매 카드 입력값", favInvalid: "번호 형식이 올바르지 않습니다 (로또 1,7,12,23,34,45 / 연금 3,123456).",
+      stats: "지출 · 당첨 통계", statSpend: "구매", statWin: "당첨금", statRatio: "회수율", statSince: "기록 시작", statAll: "전체 계정", statThis: "이 계정",
+      statWins: "최근 당첨", statNone: "아직 기록이 없습니다.", statNote: "애드온이 확인한 구매·당첨 기준입니다 (다른 곳에서 산 복권도 동기화되면 포함).",
+      auto: "자동 구매 · 알림", autoMaster: "정기 자동 구매 사용", autoOnTitle: "정기 자동 구매 켜기", autoOn: "켜기",
+      autoOnConfirm: "예약한 시각에 확인 창 없이 예치금에서 결제됩니다. 주간 5게임·연금 하루 한도·계정 간 20초 간격·판매 시간·예치금 확인은 그대로 적용됩니다. 켤까요?",
+      autoAdd: "일정 추가", autoEmpty: "등록된 일정이 없습니다.", autoAllAcc: "모든 계정", autoDel: "일정 삭제",
+      autoGuard: "보호 장치: 일정당 하루 1번 · 예약 후 10분 안에만 실행 · 판매 시간·로그인·예치금 확인 · 주간 5게임·연금 하루 한도·계정 간 20초",
+      autoNeedDay: "요일을 하나 이상 고르세요.", dayNames: "월,화,수,목,금,토,일",
+      notify: "알림", nPersistent: "HA 알림(종 모양)", nService: "모바일 알림 서비스", nServicePh: "notify.mobile_app_내폰", nWin: "당첨 알림",
+      nPurchase: "구매 결과 알림", nLow: "예치금 부족 알림", nThreshold: "부족 기준(원)", nTest: "테스트 알림", nTestOk: "보냈습니다. HA 알림·휴대폰을 확인하세요.",
+      nTestFail: "보내지 못했습니다. 알림 서비스 이름을 확인하세요.", nEvents: "자동화용 이벤트: dhlotto45_purchase · dhlotto45_win · dhlotto45_low_deposit",
+      diag: "🩺 진단 리포트 복사", diagCopied: "진단 리포트를 복사했습니다. 문의 글에 붙여넣으세요 (아이디·IP는 가려져 있음).",
+      diagManual: "아래 내용을 전체 선택해 복사하세요 (아이디·IP는 가려져 있음).", diagTitle: "진단 리포트", sSupport: "문의 · 진단",
+      genMode: "방식", genRandom: "완전 무작위", genHot: "자주 나온 번호 위주", genCold: "덜 나온 번호 위주", genMix: "자주+덜 섞기",
+      genOdd: "홀짝 균형", genSum: "합계 100~175", genSeq: "3연속 제외", genNote: "어떤 방식이든 당첨 확률은 같습니다 (재미용).", saveErr: "저장 실패: " },
     en: { reload: "↻ Refresh", settings: "Settings", lang: "KO", summary: "Account", deposit: "Deposit", available: "Available to buy",
       login: "Login", ok: "OK", fail: "Failed", sync: "Sync", updatedAt: "Last update", buy: "Buy tickets",
       lottoCur: "Lotto · this round", lottoPrev: "Lotto · last round", penCur: "Pension · this round", penPrev: "Pension · last round",
@@ -329,7 +370,23 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       density: "Spacing", comfortable: "Comfortable", compact: "Compact", ballStyle: "Lotto balls", glossy: "Glossy", flat: "Flat",
       effects: "Win celebration & animation", showHero: "Lucky banner", luckyPh: "e.g. This week is mine!", firstAcc: "First account",
       reset: "Reset", savedOk: "Saved to HA · applies on every device", saveFail: "Save failed (this device only)", close: "Close",
-      gBasic: "Basic", gLucky: "Lucky", gNight: "Night & future", up: "Up", down: "Down", groupSuffix: "G" }
+      gBasic: "Basic", gLucky: "Lucky", gNight: "Night & future", up: "Up", down: "Down", groupSuffix: "G",
+      favorites: "Favorite numbers", favEmpty: "No saved numbers yet. Add one below.", favName: "Name (optional)", favAdd: "Add",
+      favBuy: "Buy", favDel: "Delete", favLotto: "Lotto", favPension: "Pension", favFromInput: "Use buy-card input", favInvalid: "Invalid numbers (lotto 1,7,12,23,34,45 / pension 3,123456).",
+      stats: "Spending & winnings", statSpend: "Spent", statWin: "Won", statRatio: "Return", statSince: "Since", statAll: "All accounts", statThis: "This account",
+      statWins: "Recent wins", statNone: "No records yet.", statNote: "Based on purchases and wins the add-on has seen (tickets bought elsewhere count once synced).",
+      auto: "Auto-buy & alerts", autoMaster: "Use scheduled auto-buy", autoOnTitle: "Turn on scheduled auto-buy", autoOn: "Turn on",
+      autoOnConfirm: "Tickets will be paid from the deposit at the scheduled time without a confirmation dialog. Weekly 5 games, pension daily limit, 20 s between accounts, sales hours and deposit checks still apply. Turn it on?",
+      autoAdd: "Add schedule", autoEmpty: "No schedules yet.", autoAllAcc: "All accounts", autoDel: "Delete schedule",
+      autoGuard: "Safeguards: once per schedule per day · runs only within 10 min of the time · sales hours, login and deposit checks · weekly 5 games, pension daily limit, 20 s between accounts",
+      autoNeedDay: "Pick at least one day.", dayNames: "Mon,Tue,Wed,Thu,Fri,Sat,Sun",
+      notify: "Notifications", nPersistent: "HA notifications (bell)", nService: "Mobile notify service", nServicePh: "notify.mobile_app_my_phone", nWin: "Win alerts",
+      nPurchase: "Purchase results", nLow: "Low deposit alerts", nThreshold: "Low deposit below (KRW)", nTest: "Send test", nTestOk: "Sent. Check HA notifications and your phone.",
+      nTestFail: "Could not send. Check the notify service name.", nEvents: "Automation events: dhlotto45_purchase · dhlotto45_win · dhlotto45_low_deposit",
+      diag: "🩺 Copy diagnostic report", diagCopied: "Diagnostic report copied. Paste it into your question (IDs and IPs are hidden).",
+      diagManual: "Select all of the text below and copy it (IDs and IPs are hidden).", diagTitle: "Diagnostic report", sSupport: "Support",
+      genMode: "Mode", genRandom: "Fully random", genHot: "Mostly hot numbers", genCold: "Mostly cold numbers", genMix: "Hot + cold mix",
+      genOdd: "Odd/even balance", genSum: "Sum 100-175", genSeq: "No 3 in a row", genNote: "Every method has the same odds (just for fun).", saveErr: "Save failed: " }
   };
   var LUCKY = {
     ko: ["오늘의 행운은 당신 편 🍀", "1등의 주인공은 바로 나!", "이번 주, 인생 역전의 기회 ✨", "행운은 준비된 사람에게 온다", "황금 공이 굴러오는 소리 🎱"],
@@ -349,13 +406,16 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     { id: "aurora", g: "gNight", ko: "오로라", en: "Aurora", sw: "linear-gradient(135deg,#0f766e,#7c3aed)" },
     { id: "galaxy", g: "gNight", ko: "은하수 소원", en: "Galaxy Wish", sw: "linear-gradient(135deg,#1e1b4b,#be185d)" }
   ];
-  var DEFAULT_ORDER = ["summary", "buy", "lotto_current", "lotto_prev", "pension_current", "pension_prev", "winning"];
-  var CARD_NAMES = { summary: "summary", buy: "buy", lotto_current: "lottoCur", lotto_prev: "lottoPrev",
-    pension_current: "penCur", pension_prev: "penPrev", winning: "winning" };
+  var DEFAULT_ORDER = ["summary", "buy", "favorites", "lotto_current", "lotto_prev", "pension_current", "pension_prev", "winning", "stats", "auto"];
+  var CARD_NAMES = { summary: "summary", buy: "buy", favorites: "favorites", lotto_current: "lottoCur", lotto_prev: "lottoPrev",
+    pension_current: "penCur", pension_prev: "penPrev", winning: "winning", stats: "stats", auto: "auto" };
 
   var prefs = {};
   try { prefs = JSON.parse(document.getElementById("dhl-prefs").textContent || "{}") || {}; } catch (e) { prefs = {}; }
-  var data = null, current = null, timer = null, pending = null, saveTimer = null, saveState = "";
+  var data = null, current = null, timer = null, saveTimer = null, saveState = "";
+  var settings = null, stats = null, statsScope = "all", modalOk = null;
+  var gen = { mode: "random", odd: false, sum: false, seq: false };
+  var autoDraft = { action: "lotto_auto_1", time: "09:00", days: [5], account: "all" };
   var luckyIdx = Math.floor(Math.random() * 5);
   // Unsent manual inputs per account, kept across the periodic re-render.
   var drafts = {};
@@ -565,16 +625,14 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       var prev = h("div", { cls: "preview", id: "lotto-preview" });
       body.push(h("div", { cls: "manual" }, [li, btn(t("manual1"), "lotto_manual", " secondary", !avail)]));
       body.push(h("div", { cls: "manual" }, [h("button", { cls: "btn lucky", type: "button", text: t("luckyPick"), onclick: function () {
-        var pool = [], picks = [];
-        for (var n = 1; n <= 45; n++) pool.push(n);
-        for (var k = 0; k < 6; k++) picks.push(pool.splice(rnd(pool.length), 1)[0]);
-        picks.sort(function (a, b) { return a - b; });
+        var picks = pickLotto(acc);
         li.value = picks.join(","); dr.lotto = li.value;
         prev.textContent = ""; prev.classList.remove("rolling"); void prev.offsetWidth; prev.classList.add("rolling");
         picks.forEach(function (p, i) { var b = ball(p); b.style.animationDelay = (i * 0.08) + "s"; prev.appendChild(b); });
       } })]));
+      body.push(genOptions());
       body.push(prev);
-      body.push(h("div", { cls: "hint", text: t("manualHint") }));
+      body.push(h("div", { cls: "hint", text: t("manualHint") + " · " + t("genNote") }));
     }
     if (data.pension_enabled) {
       body.push(h("div", { cls: "sect", text: "🎟️ PENSION 720+" }));
@@ -599,6 +657,223 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       body.push(h("div", { cls: "status " + la.status, text: txt + (la.finished ? " (" + fmtTime(la.finished) + ")" : "") }));
     }
     return card("buy", "🛒", t("buy"), acc.label, body);
+  }
+
+  // ------------------------------------------------------------ number generator
+  function numsFrom(acc, id) { return (at(acc, id).numbers || []).map(Number).filter(function (n) { return n >= 1 && n <= 45; }); }
+  function takeFrom(picks, src, k) {
+    var s = src.filter(function (x) { return picks.indexOf(x) < 0; });
+    for (var i = 0; i < k && s.length; i++) picks.push(s.splice(rnd(s.length), 1)[0]);
+  }
+  function genOk(p) {
+    var odd = p.filter(function (n) { return n % 2; }).length, sum = p.reduce(function (a, b) { return a + b; }, 0);
+    if (gen.odd && (odd < 2 || odd > 4)) return false;
+    if (gen.sum && (sum < 100 || sum > 175)) return false;
+    if (gen.seq) for (var i = 2; i < p.length; i++) if (p[i] - p[i - 1] === 1 && p[i - 1] - p[i - 2] === 1) return false;
+    return true;
+  }
+  function pickLotto(acc) {
+    var hot = numsFrom(acc, "lotto45_hot_numbers"), cold = numsFrom(acc, "lotto45_cold_numbers"), all = [], picks = [];
+    for (var n = 1; n <= 45; n++) all.push(n);
+    for (var tries = 0; tries < 3000; tries++) {
+      picks = [];
+      if (gen.mode === "hot") takeFrom(picks, hot, 3);
+      else if (gen.mode === "cold") takeFrom(picks, cold, 3);
+      else if (gen.mode === "mix") { takeFrom(picks, hot, 2); takeFrom(picks, cold, 2); }
+      takeFrom(picks, all, 6 - picks.length);
+      picks.sort(function (a, b) { return a - b; });
+      if (genOk(picks)) break;
+    }
+    return picks;
+  }
+  function genOptions() {
+    var sel = h("select", { "aria-label": t("genMode"), onchange: function (e) { gen.mode = e.target.value; } },
+      [["random", t("genRandom")], ["hot", t("genHot")], ["cold", t("genCold")], ["mix", t("genMix")]].map(function (o) {
+        return h("option", { value: o[0], selected: gen.mode === o[0] ? "selected" : null, text: o[1] });
+      }));
+    function opt(key, label) {
+      return h("label", null, [h("input", { type: "checkbox", checked: gen[key] ? "checked" : null, onchange: function (e) { gen[key] = e.target.checked; } }), label]);
+    }
+    return h("div", { cls: "genopts" }, [h("span", { text: t("genMode") }), sel, opt("odd", t("genOdd")), opt("sum", t("genSum")), opt("seq", t("genSeq"))]);
+  }
+
+  // ------------------------------------------------------------ favorites
+  function favoritesCard(acc) {
+    var favs = (settings && settings.favorites) || [], body = [];
+    var running = acc.last_action && acc.last_action.status === "running";
+    if (!favs.length) body.push(h("div", { cls: "empty", text: t("favEmpty") }));
+    else body.push(h("div", { cls: "rows" }, favs.map(function (f) {
+      var isL = f.type === "lotto";
+      var vis = isL ? String(f.numbers).split(",").map(function (x) { return x === "auto" ? h("span", { cls: "ball q", text: "?" }) : ball(x); }) : [ticket(f.group, f.digits)];
+      var off = running || (isL ? (!data.purchase_available || !data.lotto_enabled) : !data.pension_enabled);
+      return h("div", { cls: "row fav" }, [h("span", { cls: "fname", text: f.name || (isL ? t("favLotto") : t("favPension")) }), h("span", { cls: "main" }, vis),
+        h("button", { cls: "btn small", type: "button", disabled: off ? "disabled" : null, text: t("favBuy"), onclick: function () {
+          ask(acc, isL ? "lotto_manual" : "pension_manual", isL ? { numbers: f.numbers } : { group: String(f.group), digits: f.digits });
+        } }),
+        h("button", { cls: "mini", type: "button", text: "✕", title: t("favDel"), "aria-label": t("favDel"), onclick: function () {
+          saveSettings({ favorites: favs.filter(function (x) { return x.id !== f.id; }) });
+        } })]);
+    })));
+    var type = h("select", { "aria-label": t("favLotto") + "/" + t("favPension") }, [h("option", { value: "lotto", text: t("favLotto") }), h("option", { value: "pension", text: t("favPension") })]);
+    var val = h("input", { cls: "mono lotto", placeholder: "1,7,12,23,34,45", autocomplete: "off", "aria-label": "numbers" });
+    var nm = h("input", { maxlength: "20", placeholder: t("favName"), "aria-label": t("favName") });
+    type.addEventListener("change", function () { val.placeholder = type.value === "lotto" ? "1,7,12,23,34,45" : "3,123456"; });
+    body.push(h("div", { cls: "manual" }, [type, val]));
+    body.push(h("div", { cls: "manual" }, [nm,
+      h("button", { cls: "btn secondary small", type: "button", text: t("favFromInput"), onclick: function () {
+        var d = draft(acc);
+        if (type.value === "lotto") val.value = d.lotto !== undefined ? d.lotto : (acc.manual_numbers || "");
+        else { var pm = String(acc.pension_manual || "").split(","); val.value = (d.group || pm[0] || "1") + "," + (d.digits || pm[1] || ""); }
+      } }),
+      h("button", { cls: "btn small", type: "button", text: t("favAdd"), disabled: favs.length >= 10 ? "disabled" : null, onclick: function () {
+        var f = { type: type.value, name: nm.value };
+        if (type.value === "lotto") f.numbers = val.value;
+        else { var parts = val.value.split(","); f.group = Number((parts[0] || "").trim()); f.digits = (parts[1] || "").trim(); }
+        var before = favs.length;
+        saveSettings({ favorites: favs.concat([f]) }, function (ok) { if (ok && settings.favorites.length === before) toast(t("favInvalid"), "err"); });
+      } })]));
+    return card("favorites", "⭐", t("favorites"), favs.length + "/10", body);
+  }
+
+  // ------------------------------------------------------------ stats
+  function statsCard() {
+    var body = [h("div", { cls: "seg" }, [["all", t("statAll")], ["acc", t("statThis")]].map(function (o) {
+      return h("button", { type: "button", "aria-pressed": statsScope === o[0] ? "true" : "false", text: o[1], onclick: function () { statsScope = o[0]; loadStats().then(render); } });
+    }))];
+    if (!stats || !stats.total || !(stats.total.spend || stats.total.win)) {
+      body.push(h("div", { cls: "empty", text: t("statNone") }));
+    } else {
+      var tot = stats.total;
+      body.push(h("dl", { cls: "kv" }, [h("dt", { text: t("statSpend") }), h("dd", { text: won(tot.spend) + " · " + tot.tickets + t("tickets") }),
+        h("dt", { text: t("statWin") }), h("dd", { text: won(tot.win) + " · " + tot.wins + t("tickets") }),
+        h("dt", { text: t("statRatio") }), h("dd", { text: tot.ratio + "%" }), h("dt", { text: t("statSince") }), h("dd", { text: stats.since || "-" })]));
+      var max = 1;
+      stats.months.forEach(function (m) { max = Math.max(max, m.spend, m.win); });
+      body.push(h("div", { cls: "bars" }, stats.months.map(function (m) {
+        var sp = h("span", { cls: "sbar spend", title: m.month + " · " + t("statSpend") + " " + won(m.spend) });
+        var wn = h("span", { cls: "sbar win", title: m.month + " · " + t("statWin") + " " + won(m.win) });
+        sp.style.height = Math.round(m.spend / max * 100) + "%"; wn.style.height = Math.round(m.win / max * 100) + "%";
+        return h("div", { cls: "bcol" }, [h("div", { cls: "bstack" }, [sp, wn]), h("span", { cls: "blbl", text: m.month.slice(5) })]);
+      })));
+      body.push(h("div", { cls: "legend" }, [h("span", null, [h("i", { bg: "color-mix(in srgb, var(--ink) 38%, transparent)" }), t("statSpend")]), h("span", null, [h("i", { bg: "var(--gold)" }), t("statWin")])]));
+      if ((stats.recent_wins || []).length) {
+        body.push(h("div", { cls: "sect", text: "🎉 " + t("statWins") }));
+        body.push(h("div", { cls: "rows" }, stats.recent_wins.slice(0, 5).map(function (w) {
+          return h("div", { cls: "row won" }, [h("span", { cls: "main", text: (stats.labels && stats.labels[w.acct] || w.acct) + " · " + (w.game === "lotto" ? "LOTTO" : "PENSION") + " " + w.round + t("round") + " " + w.info }),
+            h("span", { cls: "res r-gold", text: w.amount ? won(w.amount) : "-" })]);
+        })));
+      }
+    }
+    body.push(h("div", { cls: "hint", text: t("statNote") }));
+    return card("stats", "📊", t("stats"), "", body);
+  }
+
+  // ------------------------------------------------------------ auto-buy & notifications
+  function dayNames() { return t("dayNames").split(","); }
+  function autoCard() {
+    if (!settings) return card("auto", "⏰", t("auto"), "", [h("div", { cls: "empty", text: "…" })]);
+    var ab = settings.auto_buy, nt = settings.notify, body = [], dn = dayNames();
+    var master = h("input", { type: "checkbox", checked: ab.enabled ? "checked" : null, "aria-label": t("autoMaster"), onchange: function (e) {
+      if (e.target.checked) {
+        e.target.checked = false;
+        openModal(t("autoOnTitle"), [t("autoOnConfirm")], t("autoOn"), function () { saveSettings({ auto_buy: { enabled: true } }); });
+      } else saveSettings({ auto_buy: { enabled: false } });
+    } });
+    body.push(h("label", { cls: "field strong" }, [h("span", { text: "⏰ " + t("autoMaster") }), master]));
+    var accs = {}; (data.accounts || []).forEach(function (a) { accs[a.id] = a.label; });
+    if (!ab.schedules.length) body.push(h("div", { cls: "empty", text: t("autoEmpty") }));
+    else body.push(h("div", { cls: "rows" }, ab.schedules.map(function (sc) {
+      var on = h("input", { type: "checkbox", checked: sc.enabled ? "checked" : null, "aria-label": sc.time, onchange: function (e) {
+        saveSettings({ auto_buy: { schedules: ab.schedules.map(function (x) { return x.id === sc.id ? Object.assign({}, x, { enabled: e.target.checked }) : x; }) } });
+      } });
+      var what = sc.days.map(function (d) { return dn[d]; }).join("·") + " " + sc.time + " · " + ((data.actions[sc.action] || {}).label || sc.action) + " · " + (sc.account === "all" ? t("autoAllAcc") : (accs[sc.account] || sc.account));
+      return h("div", { cls: "sched" + (sc.enabled ? "" : " off") }, [on, h("span", { text: what }),
+        h("button", { cls: "mini", type: "button", text: "✕", title: t("autoDel"), "aria-label": t("autoDel"), onclick: function () {
+          saveSettings({ auto_buy: { schedules: ab.schedules.filter(function (x) { return x.id !== sc.id; }) } });
+        } })]);
+    })));
+    var act = h("select", { "aria-label": "action", onchange: function (e) { autoDraft.action = e.target.value; } },
+      ["lotto_auto_1", "lotto_auto_5", "pension_auto_1", "pension_auto_5"].filter(function (a) { return a.indexOf("lotto") === 0 ? data.lotto_enabled : data.pension_enabled; }).map(function (a) {
+        return h("option", { value: a, selected: autoDraft.action === a ? "selected" : null, text: (data.actions[a] || {}).label || a });
+      }));
+    var tm = h("input", { type: "time", value: autoDraft.time, "aria-label": "time", onchange: function (e) { autoDraft.time = e.target.value; } });
+    var who = h("select", { "aria-label": "account", onchange: function (e) { autoDraft.account = e.target.value; } },
+      [h("option", { value: "all", text: t("autoAllAcc") })].concat((data.accounts || []).map(function (a) {
+        return h("option", { value: a.id, selected: autoDraft.account === a.id ? "selected" : null, text: a.label });
+      })));
+    var days = h("div", { cls: "days" }, dn.map(function (nm, i) {
+      return h("button", { type: "button", "aria-pressed": autoDraft.days.indexOf(i) >= 0 ? "true" : "false", text: nm, onclick: function (e) {
+        var k = autoDraft.days.indexOf(i); if (k >= 0) autoDraft.days.splice(k, 1); else autoDraft.days.push(i);
+        e.target.setAttribute("aria-pressed", k >= 0 ? "false" : "true");
+      } });
+    }));
+    body.push(h("div", { cls: "sect", text: "➕ " + t("autoAdd") }));
+    body.push(h("div", { cls: "manual" }, [act, tm, who]));
+    body.push(h("div", { cls: "manual" }, [days, h("button", { cls: "btn small", type: "button", text: t("autoAdd"), disabled: ab.schedules.length >= 8 ? "disabled" : null, onclick: function () {
+      if (!autoDraft.days.length) { toast(t("autoNeedDay"), "err"); return; }
+      var sc = { action: act.value || autoDraft.action, time: tm.value || autoDraft.time, days: autoDraft.days.slice(), account: who.value || "all", enabled: true };
+      saveSettings({ auto_buy: { schedules: ab.schedules.concat([sc]) } });
+    } })]));
+    body.push(h("div", { cls: "hint", text: "🛡️ " + t("autoGuard") }));
+
+    body.push(h("div", { cls: "sect", text: "🔔 " + t("notify") }));
+    function ntog(key, label) {
+      return h("label", { cls: "field" }, [h("span", { text: label }), h("input", { type: "checkbox", checked: nt[key] ? "checked" : null, onchange: function (e) {
+        var c = {}; c[key] = e.target.checked; saveSettings({ notify: c });
+      } })]);
+    }
+    body.push(ntog("persistent", t("nPersistent")));
+    var svc = h("input", { type: "text", value: nt.service || "", placeholder: t("nServicePh"), "aria-label": t("nService"), autocomplete: "off", onchange: function (e) {
+      saveSettings({ notify: { service: e.target.value.trim() } }, function (ok) { if (ok && e.target.value.trim() && !settings.notify.service) toast(t("nTestFail"), "err"); });
+    } });
+    body.push(h("div", { cls: "field" }, [h("span", { text: t("nService") }), svc]));
+    body.push(ntog("win", t("nWin")));
+    body.push(ntog("purchase", t("nPurchase")));
+    body.push(ntog("low_deposit", t("nLow")));
+    var thr = h("input", { type: "text", inputmode: "numeric", value: String(nt.low_deposit_threshold), "aria-label": t("nThreshold"), onchange: function (e) {
+      var v = Number(String(e.target.value).replace(/[^0-9]/g, "")); saveSettings({ notify: { low_deposit_threshold: isFinite(v) ? v : 0 } });
+    } });
+    body.push(h("div", { cls: "field" }, [h("span", { text: t("nThreshold") }), thr]));
+    body.push(h("div", { cls: "manual" }, [h("button", { cls: "btn secondary small", type: "button", text: "🔔 " + t("nTest"), onclick: function () {
+      postJson("api/notify-test", {}).then(function (j) { toast(j.ok ? t("nTestOk") : t("nTestFail"), j.ok ? "ok" : "err"); }).catch(function (e) { toast(t("nTestFail") + " " + e.message, "err"); });
+    } }), h("button", { cls: "btn secondary small", type: "button", text: t("diag"), onclick: copyDiag })]));
+    body.push(h("div", { cls: "hint", text: t("nEvents") }));
+    return card("auto", "⏰", t("auto"), ab.enabled ? "ON" : "OFF", body);
+  }
+
+  // ------------------------------------------------------------ settings / stats / diagnostics IO
+  function toast(msg, kind) { var n = document.getElementById("notices"); n.insertBefore(h("div", { cls: "notice " + (kind || ""), text: msg }), n.firstChild); }
+  function getJson(url) {
+    return fetch(url, { credentials: "same-origin", cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+  }
+  function sendJson(url, method, body) {
+    return fetch(url, { method: method, credentials: "same-origin", cache: "no-store",
+      headers: { "Content-Type": "application/json", "X-DHL-CSRF": CSRF }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status)); return j; }); });
+  }
+  function postJson(url, body) { return sendJson(url, "POST", body); }
+  function loadSettings() { return getJson("api/settings").then(function (j) { settings = j; }).catch(function () {}); }
+  function loadStats() {
+    var q = statsScope === "acc" && current ? "?account=" + encodeURIComponent(current) : "";
+    return getJson("api/stats" + q).then(function (j) { stats = j; }).catch(function () {});
+  }
+  function saveSettings(change, after) {
+    return sendJson("api/settings", "PUT", change)
+      .then(function (j) { settings = j; render(); if (after) after(true); })
+      .catch(function (e) { toast(t("saveErr") + e.message, "err"); if (after) after(false); });
+  }
+  function copyDiag() {
+    getJson("api/diagnostics").then(function (j) {
+      var txt = j.text || "";
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(txt).then(function () { toast(t("diagCopied"), "ok"); }, function () { showDiag(txt); });
+      } else showDiag(txt);
+    }).catch(function (e) { toast(t("loadFail") + e.message, "err"); });
+  }
+  function showDiag(txt) {
+    var ta = h("textarea", { cls: "diag mono", readonly: "readonly", "aria-label": t("diagTitle") }); ta.value = txt;
+    openModal(t("diagTitle"), [t("diagManual"), ta], t("close"), null, true);
+    setTimeout(function () { ta.focus(); ta.select(); }, 50);
   }
 
   function renderCelebrate(acc) {
@@ -643,8 +918,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     [["lotto45_login_error", "loginErr"], ["lotto45_purchase_error", "lottoErr"], ["pension720_purchase_error", "penErr"]].forEach(function (p) {
       var v = st(acc, p[0]); if (v && v !== "없음") notes.appendChild(h("div", { cls: "notice err", text: t(p[1]) + ": " + v }));
     });
-    var builders = { summary: summaryCard, buy: buyCard, lotto_current: lottoCurrentCard, lotto_prev: lottoPrevCard,
-      pension_current: pensionCurrentCard, pension_prev: pensionPrevCard, winning: winningCard };
+    var builders = { summary: summaryCard, buy: buyCard, favorites: favoritesCard, lotto_current: lottoCurrentCard, lotto_prev: lottoPrevCard,
+      pension_current: pensionCurrentCard, pension_prev: pensionPrevCard, winning: winningCard, stats: statsCard, auto: autoCard };
     var hidden = prefs.hidden_cards || [];
     (prefs.card_order || DEFAULT_ORDER).forEach(function (id) {
       if (hidden.indexOf(id) >= 0 || !builders[id]) return;
@@ -662,7 +937,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   function load() {
     fetch("api/dashboard", { credentials: "same-origin", cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error(r.status === 403 ? t("ingressOnly") : "HTTP " + r.status); return r.json(); })
-      .then(function (j) { data = j; render(); })
+      .then(function (j) { data = j; return Promise.all([loadSettings(), loadStats()]); })
+      .then(function () { render(); })
       .catch(function (e) { render(); document.getElementById("notices").appendChild(h("div", { cls: "notice err", text: t("loadFail") + e.message })); })
       .then(schedule);
   }
@@ -674,25 +950,28 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     if (action === "pension_manual") { body.group = (document.getElementById("p-group") || {}).value || ""; body.digits = (document.getElementById("p-num") || {}).value || ""; }
     return body;
   }
-  function ask(acc, action) {
-    var info = data.actions[action]; if (!info) return;
-    pending = collect(action);
-    var detail = action === "lotto_manual" ? " (" + pending.numbers + ")" : action === "pension_manual" ? " (" + pending.group + "-" + pending.digits + ")" : "";
+  function openModal(title, nodes, okText, onOk, hideCancel) {
+    document.getElementById("m-title").textContent = title;
     var b = document.getElementById("m-body"); b.textContent = "";
-    b.appendChild(document.createTextNode(acc.label + t("confirmBody1") + info.label + detail + " — "));
-    b.appendChild(h("span", { cls: "amt", text: won(info.amount) }));
-    b.appendChild(document.createTextNode(t("confirmBody2")));
+    nodes.forEach(function (n) { b.appendChild(typeof n === "string" ? document.createTextNode(n) : n); });
+    var ok = document.getElementById("m-ok"), cancel = document.getElementById("m-cancel");
+    ok.textContent = okText; cancel.textContent = t("cancel"); cancel.hidden = !!hideCancel; modalOk = onOk || null;
     document.getElementById("modal").classList.add("show");
-    document.getElementById("m-cancel").focus();
+    (hideCancel ? ok : cancel).focus();
   }
-  function closeModal() { document.getElementById("modal").classList.remove("show"); pending = null; }
-  function confirmBuy() {
-    var body = pending; closeModal(); if (!body) return;
-    fetch("api/purchase", { method: "POST", credentials: "same-origin", cache: "no-store",
-      headers: { "Content-Type": "application/json", "X-DHL-CSRF": CSRF }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status)); return j; }); })
+  function closeModal() { document.getElementById("modal").classList.remove("show"); modalOk = null; }
+  function modalConfirm() { var cb = modalOk; closeModal(); if (cb) cb(); }
+  function ask(acc, action, preset) {
+    var info = data.actions[action]; if (!info) return;
+    var body = preset ? Object.assign({ account: acc.id, action: action }, preset) : collect(action);
+    var detail = action === "lotto_manual" ? " (" + body.numbers + ")" : action === "pension_manual" ? " (" + body.group + "-" + body.digits + ")" : "";
+    openModal(t("confirmTitle"), [acc.label + t("confirmBody1") + info.label + detail + " — ", h("span", { cls: "amt", text: won(info.amount) }), t("confirmBody2")],
+      t("confirm"), function () { sendBuy(body); });
+  }
+  function sendBuy(body) {
+    postJson("api/purchase", body)
       .then(function () { delete drafts[body.account]; load(); })
-      .catch(function (e) { var n = document.getElementById("notices"); n.insertBefore(h("div", { cls: "notice err", text: t("buyFail") + e.message }), n.firstChild); });
+      .catch(function (e) { toast(t("buyFail") + e.message, "err"); });
   }
 
   // ------------------------------------------------------------ settings drawer
@@ -750,6 +1029,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
         h("button", { cls: "mini", type: "button", title: t("up"), "aria-label": t("up"), disabled: i === 0 ? "disabled" : null, text: "↑", onclick: function () { move(-1); } }),
         h("button", { cls: "mini", type: "button", title: t("down"), "aria-label": t("down"), disabled: i === order.length - 1 ? "disabled" : null, text: "↓", onclick: function () { move(1); } })]);
     })));
+    d.appendChild(h("h5", { text: t("sSupport") }));
+    d.appendChild(h("div", { cls: "field" }, [h("button", { cls: "btn secondary small", type: "button", text: t("diag"), onclick: copyDiag })]));
     d.appendChild(h("div", { cls: "field" }, [h("span"), h("button", { cls: "btn secondary", type: "button", text: t("reset"), onclick: function () {
       prefs = { theme: "system", lang: prefs.lang || "ko", density: "comfortable", ball_style: "glossy", effects: true, show_hero: true,
         lucky_message: "", default_account: "", hidden_cards: [] };
@@ -760,7 +1041,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
 
   // ------------------------------------------------------------ wire up
   document.getElementById("m-cancel").addEventListener("click", closeModal);
-  document.getElementById("m-ok").addEventListener("click", confirmBuy);
+  document.getElementById("m-ok").addEventListener("click", modalConfirm);
   document.getElementById("modal").addEventListener("click", function (e) { if (e.target.id === "modal") closeModal(); });
   document.getElementById("drawer-bg").addEventListener("click", closeDrawer);
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") { closeModal(); closeDrawer(); } });

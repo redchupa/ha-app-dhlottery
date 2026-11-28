@@ -201,7 +201,8 @@ THEMES = (
     "jackpot-gold", "clover", "lucky-red", "golden-pig", "lotto-pop",     # 행운
     "neon-draw", "aurora", "galaxy",                                      # 밤하늘·미래
 )
-CARD_IDS = ("summary", "buy", "lotto_current", "lotto_prev", "pension_current", "pension_prev", "winning")
+CARD_IDS = ("summary", "buy", "favorites", "lotto_current", "lotto_prev", "pension_current", "pension_prev",
+            "winning", "stats", "auto")
 LUCKY_MESSAGE_MAX = 40
 
 DEFAULT_PREFS = {
