@@ -113,7 +113,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.8.0"
+APP_VERSION = "2.9.0"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -2187,6 +2187,7 @@ async def api_dashboard(request: Request):
             "label": label,
             "enabled": account.enabled,
             "logged_in": bool(account.client and getattr(account.client, "logged_in", False)),
+            "cooldown_remaining": round(purchase_guard.get_remaining_cooldown(username), 1),
             "manual_numbers": account.manual_numbers_state,
             "pension_manual": account.pension_manual_state,
             "last_action": account.last_action,
@@ -2202,6 +2203,7 @@ async def api_dashboard(request: Request):
             "lotto_enabled": bool(config["enable_lotto645"]),
             "pension_enabled": bool(config.get("enable_pension720", True)),
             "purchase_available": is_purchase_available_now(),
+            "cooldown_seconds": int(INTER_ACCOUNT_COOLDOWN_SECONDS),
             "actions": actions,
             "accounts": out,
         },
@@ -2379,6 +2381,77 @@ async def api_purchase(request: Request):
     _dashboard_tasks.add(task)
     task.add_done_callback(_dashboard_tasks.discard)
     return JSONResponse({"accepted": True, "action": action, "label": label}, status_code=202, headers=_SECURITY_HEADERS)
+
+
+_sim_history_cache: dict = {"ts": 0.0, "draws": []}
+_sim_history_lock = asyncio.Lock()
+_SIM_CACHE_TTL = 3600.0
+
+
+@app.post("/api/relogin")
+async def api_relogin(request: Request):
+    """단일 계정 원클릭 재로그인(세션 갱신). 애드온 전체 재시작 없이 세션을 복구한다."""
+    _require_ingress(request)
+    if not csrf_ok(DASHBOARD_CSRF_TOKEN, request.headers.get(CSRF_HEADER)):
+        raise HTTPException(status_code=403, detail="보안 토큰이 올바르지 않습니다. 페이지를 새로고침하세요.")
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail="요청 형식이 올바르지 않습니다.")
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="요청 형식이 올바르지 않습니다.")
+
+    username = resolve_alias(list(accounts.keys()), str(body.get("account") or ""))
+    account = accounts.get(username) if username else None
+    if account is None or not account.enabled:
+        raise HTTPException(status_code=404, detail="계정을 찾을 수 없습니다.")
+
+    try:
+        if account.client is None:
+            ok = await init_account(account)
+            if not ok:
+                raise DhLotteryLoginError("계정 초기화/로그인에 실패했습니다.")
+        else:
+            await account.client.async_login()
+        await update_sensors_for_account(account)
+        logger.info(f"[DASH][{mask_username(username)}] 원클릭 재로그인 성공")
+        return JSONResponse({"ok": True, "logged_in": True}, headers=_SECURITY_HEADERS)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[DASH][{mask_username(username)}] 원클릭 재로그인 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"재로그인 실패: {str(e)[:180]}")
+
+
+@app.get("/api/simulate")
+async def api_simulate(request: Request, numbers: str = "", rounds: int = 50):
+    """즐겨찾기/수동 번호 과거 당첨 시뮬레이션 (최근 최대 100회차 캐시 사용)."""
+    _require_ingress(request)
+    rounds = max(10, min(100, int(rounds)))
+    try:
+        # 입력 형식 선검증 (네트워크 호출 전)
+        FT.simulate_lotto_numbers(numbers, [])
+    except DashboardInputError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    now = time.monotonic()
+    draws = _sim_history_cache["draws"]
+    if not draws or (now - _sim_history_cache["ts"]) > _SIM_CACHE_TTL:
+        async with _sim_history_lock:
+            now = time.monotonic()
+            if not _sim_history_cache["draws"] or (now - _sim_history_cache["ts"]) > _SIM_CACHE_TTL:
+                try:
+                    async with DhMobileApiClient() as mobile:
+                        fetched = await mobile.async_get_round_history(100)
+                    _sim_history_cache["draws"] = fetched
+                    _sim_history_cache["ts"] = time.monotonic()
+                except Exception as e:  # noqa: BLE001
+                    raise HTTPException(status_code=502, detail=f"과거 당첨번호를 불러오지 못했습니다: {str(e)[:120]}")
+            draws = _sim_history_cache["draws"]
+
+    try:
+        result = FT.simulate_lotto_numbers(numbers, draws[:rounds])
+    except DashboardInputError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return JSONResponse(result, headers=_SECURITY_HEADERS)
 
 
 # ================================================================ v2.7.0 확장 기능

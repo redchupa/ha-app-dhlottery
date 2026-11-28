@@ -2,6 +2,7 @@
 
 [![Home Assistant에 앱 저장소 추가](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fredchupa%2Fha-app-dhlottery)
 
+[![Unit Tests](https://github.com/redchupa/ha-app-dhlottery/actions/workflows/ci.yml/badge.svg)](https://github.com/redchupa/ha-app-dhlottery/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/redchupa/ha-app-dhlottery)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/redchupa/ha-app-dhlottery?style=social)](https://github.com/redchupa/ha-app-dhlottery/stargazers)
 

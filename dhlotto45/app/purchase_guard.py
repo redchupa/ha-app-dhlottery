@@ -268,6 +268,20 @@ class InterAccountPurchaseGuard:
             self._last_completed_username = username
             self._last_completed_at = self._clock()
 
+    def get_remaining_cooldown(self, username: str) -> float:
+        """해당 계정이 구매 가능해지기까지 남은 대기 시간(초)을 반환한다. 즉시 가능하면 0.0."""
+        if self._active_username is not None:
+            return self.cooldown_seconds
+        if (
+            self._last_completed_username is not None
+            and self._last_completed_username != username
+            and self._last_completed_at is not None
+        ):
+            elapsed = self._clock() - self._last_completed_at
+            if elapsed < self.cooldown_seconds:
+                return max(0.0, self.cooldown_seconds - elapsed)
+        return 0.0
+
     def reset(self) -> None:
         """테스트 및 재초기화용 상태 리셋."""
         self._active_username = None

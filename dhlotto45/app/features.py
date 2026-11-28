@@ -434,5 +434,95 @@ class RingLogHandler(logging.Handler):
         return list(self.lines)[-n:]
 
 
+# ---------------------------------------------------------------- simulator
+SIM_PRIZE_ESTIMATE = {
+    1: 2_000_000_000,
+    2: 50_000_000,
+    3: 1_500_000,
+    4: 50_000,
+    5: 5_000,
+}
+
+
+def simulate_lotto_numbers(numbers_text: str, draws: list) -> dict:
+    """즐겨찾기/수동 번호를 과거 당첨 회차 목록과 대조해 가상 수익·당첨 통계를 계산한다.
+
+    Args:
+        numbers_text: '1,7,12,23,34,45' 또는 'auto'가 섞인 6칸 문자열.
+        draws: [{"round_no"|"round": int, "numbers": [int...], "bonus": int|None}, ...]
+
+    Returns:
+        {numbers, fixed_count, checked_rounds, total_spend, total_win, roi,
+         rank_counts: {"1".."5"}, best_rank, hits: [...]}
+    """
+    normalized = normalize_lotto_manual(numbers_text)
+    fixed = sorted({int(p) for p in normalized.split(",") if p.isdigit()})
+    if len(fixed) < 3:
+        raise DashboardInputError("시뮬레이션은 고정 번호가 최소 3개 이상 필요합니다.")
+
+    fixed_set = set(fixed)
+    rank_counts = {str(r): 0 for r in range(1, 6)}
+    total_win = 0
+    best_rank = None
+    hits = []
+    checked = 0
+
+    for d in draws or []:
+        if not isinstance(d, dict):
+            continue
+        win_nums = [int(n) for n in (d.get("numbers") or []) if str(n).isdigit()]
+        if len(win_nums) < 6:
+            continue
+        checked += 1
+        win_set = set(win_nums[:6])
+        bonus = d.get("bonus")
+        bonus_int = int(bonus) if bonus is not None and str(bonus).isdigit() else None
+
+        matched = sorted(fixed_set & win_set)
+        m = len(matched)
+        has_bonus = bonus_int is not None and bonus_int in fixed_set
+
+        rank = None
+        if m == 6:
+            rank = 1
+        elif m == 5 and has_bonus:
+            rank = 2
+        elif m == 5:
+            rank = 3
+        elif m == 4:
+            rank = 4
+        elif m == 3:
+            rank = 5
+
+        if rank is not None:
+            rank_counts[str(rank)] += 1
+            prize = SIM_PRIZE_ESTIMATE[rank]
+            total_win += prize
+            if best_rank is None or rank < best_rank:
+                best_rank = rank
+            if len(hits) < 10:
+                hits.append({
+                    "round": int(d.get("round_no") or d.get("round") or 0),
+                    "rank": rank,
+                    "matched": matched,
+                    "bonus": has_bonus and rank == 2,
+                    "prize": prize,
+                })
+
+    total_spend = checked * 1000
+    roi = round((total_win / total_spend) * 100.0, 1) if total_spend > 0 else 0.0
+    return {
+        "numbers": normalized,
+        "fixed_count": len(fixed),
+        "checked_rounds": checked,
+        "total_spend": total_spend,
+        "total_win": total_win,
+        "roi": roi,
+        "rank_counts": rank_counts,
+        "best_rank": best_rank,
+        "hits": hits,
+    }
+
+
 def now_kst() -> datetime:
     return datetime.now(KST)

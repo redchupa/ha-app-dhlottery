@@ -287,6 +287,27 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 .manual input[type=time] { width: 110px; }
 textarea.diag { display: block; width: 100%; height: 240px; font-size: 11px; margin-top: 8px; background: var(--chip); color: var(--ink);
   border: 1px solid var(--line); border-radius: 10px; padding: 8px; resize: vertical; }
+.picker-wrap { margin-top: 8px; padding: 10px; border-radius: 12px; background: var(--chip); border: 1px solid var(--line); }
+.picker-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
+.picker-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; }
+.pball { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; height: 32px; font-size: 12px; font-weight: 700; cursor: pointer; display: grid; place-items: center; transition: transform .1s ease, background .12s ease; }
+.pball:hover { border-color: var(--accent); }
+.pball[aria-pressed="true"] { border-color: transparent; color: #fff; transform: scale(1.06); box-shadow: 0 2px 6px rgba(0,0,0,.22); }
+.pball[aria-pressed="true"].y { background: #e0ad00; color: #2b2005; }
+.pball[aria-pressed="true"].b { background: #3fa9de; }
+.pball[aria-pressed="true"].r { background: #e5534b; }
+.pball[aria-pressed="true"].g { background: #79b33a; }
+.pball[aria-pressed="true"].l { background: #8a8f98; }
+.cooldown-pill { margin-bottom: 8px; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, var(--gold) 18%, var(--card)); border: 1px solid color-mix(in srgb, var(--gold) 55%, var(--line)); font-size: 13px; font-weight: 700; color: var(--ink); }
+.sim-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; }
+.sim-stat { background: var(--chip); border-radius: 10px; padding: 8px; text-align: center; }
+.sim-stat b { display: block; font-size: 15px; color: var(--ink); }
+.sim-stat span { font-size: 11px; color: var(--muted); }
+.sim-ranks { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.sim-chip { background: var(--chip); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; font-size: 12px; }
+.sim-chip.hit { border-color: var(--gold); color: var(--gold); font-weight: 700; }
+.inline-btn { margin-left: 8px; vertical-align: middle; }
+@media (max-width: 520px) { .picker-grid { grid-template-columns: repeat(7, 1fr); } }
 footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px 16px 30px; }
 @media (max-width: 900px) { .hero { grid-template-columns: 1.1fr 1fr; } .hero-art { display: none; } }
 @media (max-width: 720px) { .hero { grid-template-columns: 1fr; } .hero-right { align-items: flex-start; } .hero-balls { justify-content: flex-start; } }
@@ -367,7 +388,12 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       diag: "🩺 진단 리포트 복사", diagCopied: "진단 리포트를 복사했습니다. 문의 글에 붙여넣으세요 (아이디·IP는 가려져 있음).",
       diagManual: "아래 내용을 전체 선택해 복사하세요 (아이디·IP는 가려져 있음).", diagTitle: "진단 리포트", sSupport: "문의 · 진단",
       genMode: "방식", genRandom: "완전 무작위", genHot: "자주 나온 번호 위주", genCold: "덜 나온 번호 위주", genMix: "자주+덜 섞기",
-      genOdd: "홀짝 균형", genSum: "합계 100~175", genSeq: "3연속 제외", genNote: "어떤 방식이든 당첨 확률은 같습니다 (재미용).", saveErr: "저장 실패: " },
+      genOdd: "홀짝 균형", genSum: "합계 100~175", genSeq: "3연속 제외", genNote: "어떤 방식이든 당첨 확률은 같습니다 (재미용).", saveErr: "저장 실패: ",
+      relogin: "🔄 재로그인", reloginBusy: "로그인 중…", reloginOk: "세션을 갱신했습니다.", reloginFail: "재로그인 실패: ",
+      cooldownWait: "⏳ 계정 간 보안 대기: ", cooldownSec: "초 후 구매 가능",
+      pickerOpen: "🎱 번호판", pickerClose: "🎱 번호판 닫기", pickerClear: "초기화", pickerHint: "1~45 중 최대 6개 선택 (남은 칸은 자동)",
+      simBtn: "🔍", simTitle: "과거 당첨 시뮬레이션", simLoading: "최근 50회차 당첨 이력을 조회 중…", simNone: "최근 50회차 중 5등 이상 당첨 이력이 없습니다.",
+      simFail: "시뮬레이션 실패: ", simRounds: "검사 회차", simRank: "등", simNote: "1~3등은 추정 평균 상금 기준이며, 과거 결과는 미래 당첨을 보장하지 않습니다." },
     en: { reload: "↻ Refresh", settings: "Settings", lang: "KO", summary: "Account", deposit: "Deposit", available: "Available to buy",
       login: "Login", ok: "OK", fail: "Failed", sync: "Sync", updatedAt: "Last update", buy: "Buy tickets",
       lottoCur: "Lotto · this round", lottoPrev: "Lotto · last round", penCur: "Pension · this round", penPrev: "Pension · last round",
@@ -405,7 +431,12 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       diag: "🩺 Copy diagnostic report", diagCopied: "Diagnostic report copied. Paste it into your question (IDs and IPs are hidden).",
       diagManual: "Select all of the text below and copy it (IDs and IPs are hidden).", diagTitle: "Diagnostic report", sSupport: "Support",
       genMode: "Mode", genRandom: "Fully random", genHot: "Mostly hot numbers", genCold: "Mostly cold numbers", genMix: "Hot + cold mix",
-      genOdd: "Odd/even balance", genSum: "Sum 100-175", genSeq: "No 3 in a row", genNote: "Every method has the same odds (just for fun).", saveErr: "Save failed: " }
+      genOdd: "Odd/even balance", genSum: "Sum 100-175", genSeq: "No 3 in a row", genNote: "Every method has the same odds (just for fun).", saveErr: "Save failed: ",
+      relogin: "🔄 Re-login", reloginBusy: "Signing in…", reloginOk: "Session refreshed.", reloginFail: "Re-login failed: ",
+      cooldownWait: "⏳ Inter-account cooldown: ", cooldownSec: "s left",
+      pickerOpen: "🎱 Number Pad", pickerClose: "🎱 Hide Pad", pickerClear: "Clear", pickerHint: "Pick up to 6 numbers (rest filled with auto)",
+      simBtn: "🔍", simTitle: "Past Draw Simulation", simLoading: "Checking last 50 draws…", simNone: "No 5th-prize or higher matches in the last 50 draws.",
+      simFail: "Simulation failed: ", simRounds: "Draws", simRank: " prize", simNote: "1st-3rd prizes use average estimates; past results do not predict future draws." }
   };
   var LUCKY = {
     ko: ["오늘의 행운은 당신 편 🍀", "1등의 주인공은 바로 나!", "이번 주, 인생 역전의 기회 ✨", "행운은 준비된 사람에게 온다", "황금 공이 굴러오는 소리 🎱"],
@@ -438,7 +469,20 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   var luckyIdx = Math.floor(Math.random() * 5);
   // Unsent manual inputs per account, kept across the periodic re-render.
   var drafts = {};
+  var cooldownUntil = {};
+  var reloginBusy = {};
   function draft(acc) { return drafts[acc.id] || (drafts[acc.id] = {}); }
+  function cooldownLeft(acc) {
+    if (!acc || !cooldownUntil[acc.id]) return 0;
+    return Math.max(0, Math.ceil((cooldownUntil[acc.id] - Date.now()) / 1000));
+  }
+  function syncCooldowns(resp) {
+    var now = Date.now();
+    ((resp && resp.accounts) || []).forEach(function (a) {
+      var rem = Number(a.cooldown_remaining || 0);
+      cooldownUntil[a.id] = rem > 0 ? now + rem * 1000 : 0;
+    });
+  }
   function t(k) { var d = T[prefs.lang] || T.ko; return d[k] !== undefined ? d[k] : (T.ko[k] !== undefined ? T.ko[k] : k); }
 
   // ------------------------------------------------------------ helpers
@@ -574,17 +618,35 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     var a = document.getElementById("cd-lotto"), b = document.getElementById("cd-pension");
     if (a) a.textContent = fmtLeft(nextDraw(6, 20, 35));
     if (b) b.textContent = fmtLeft(nextDraw(4, 19, 5));
+    var cdEl = document.getElementById("cd-buy-banner");
+    var acc = currentAcc();
+    if (cdEl && acc) {
+      var left = cooldownLeft(acc);
+      if (left > 0) cdEl.textContent = t("cooldownWait") + left + t("cooldownSec");
+      else render();
+    }
   }, 1000);
   setInterval(function () { luckyIdx++; var m = document.getElementById("hero-msg"); if (m) m.textContent = luckyMsg(); }, 8000);
 
   // ------------------------------------------------------------ cards
+  function doRelogin(acc) {
+    if (!acc || reloginBusy[acc.id]) return;
+    reloginBusy[acc.id] = true; render();
+    postJson("api/relogin", { account: acc.id })
+      .then(function () { toast(t("reloginOk"), "ok"); return load(); })
+      .catch(function (e) { toast(t("reloginFail") + e.message, "err"); })
+      .then(function () { delete reloginBusy[acc.id]; render(); });
+  }
   function summaryCard(acc) {
     var bal = st(acc, "lotto45_balance"), ba = at(acc, "lotto45_balance"), last = S(acc, "lotto45_last_update");
+    var busy = !!reloginBusy[acc.id];
+    var reloginBtn = h("button", { cls: "mini inline-btn", type: "button", disabled: busy ? "disabled" : null,
+      text: busy ? t("reloginBusy") : t("relogin"), onclick: function () { doRelogin(acc); } });
     return card("summary", "💰", t("summary"), acc.label, [
       h("div", { cls: "big", text: bal === null ? "-" : won(bal) }), h("div", { cls: "hint", text: t("deposit") }),
       h("dl", { cls: "kv" }, [
         h("dt", { text: t("available") }), h("dd", { text: ba.purchase_available !== undefined ? won(ba.purchase_available) : "-" }),
-        h("dt", { text: t("login") }), h("dd", null, [h("span", { cls: "dot " + (acc.logged_in ? "on" : "off") }), acc.logged_in ? t("ok") : t("fail")]),
+        h("dt", { text: t("login") }), h("dd", null, [h("span", { cls: "dot " + (acc.logged_in ? "on" : "off") }), acc.logged_in ? t("ok") : t("fail"), reloginBtn]),
         h("dt", { text: t("sync") }), h("dd", { text: st(acc, "lotto45_sync_status") || "-" }),
         h("dt", { text: t("updatedAt") }), h("dd", { text: last ? fmtTime(last.ts) : "-" })
       ])
@@ -646,24 +708,70 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     if (!body.length) body.push(h("div", { cls: "empty", text: t("notLoaded") }));
     return card("winning", "🏆", t("winning"), "", body);
   }
+  function parseFixedNums(text) {
+    var out = [];
+    String(text || "").split(",").forEach(function (p) {
+      var n = Number(p.trim());
+      if (Number.isInteger(n) && n >= 1 && n <= 45 && out.indexOf(n) < 0) out.push(n);
+    });
+    return out.slice(0, 6).sort(function (a, b) { return a - b; });
+  }
+  function formatManualNums(nums) {
+    var arr = nums.slice(0, 6).sort(function (a, b) { return a - b; }).map(String);
+    while (arr.length < 6) arr.push("auto");
+    return arr.join(",");
+  }
   function buyCard(acc) {
-    var avail = data.purchase_available, running = acc.last_action && acc.last_action.status === "running", body = [];
+    var avail = data.purchase_available, running = acc.last_action && acc.last_action.status === "running", cdLeft = cooldownLeft(acc), body = [];
+    if (cdLeft > 0) body.push(h("div", { cls: "cooldown-pill", id: "cd-buy-banner", text: t("cooldownWait") + cdLeft + t("cooldownSec") }));
     function btn(label, action, extra, disabled) {
-      return h("button", { cls: "btn" + (extra || ""), type: "button", disabled: (running || disabled) ? "disabled" : null, onclick: function () { ask(acc, action); }, text: label });
+      return h("button", { cls: "btn" + (extra || ""), type: "button", disabled: (running || cdLeft > 0 || disabled) ? "disabled" : null, onclick: function () { ask(acc, action); }, text: label });
     }
     if (data.lotto_enabled) {
       body.push(h("div", { cls: "sect", text: "🎱 " + t("lottoName") }));
       body.push(h("div", { cls: "btns" }, [btn(t("auto1"), "lotto_auto_1", "", !avail), btn(t("auto5"), "lotto_auto_5", "", !avail)]));
       var dr = draft(acc);
-      var li = h("input", { cls: "lotto mono", id: "lotto-manual", value: dr.lotto !== undefined ? dr.lotto : (acc.manual_numbers || ""), oninput: function () { dr.lotto = li.value; }, placeholder: "1,7,12,auto,auto,auto", "aria-label": t("manual1"), autocomplete: "off" });
+      var curVal = dr.lotto !== undefined ? dr.lotto : (acc.manual_numbers || "");
+      var li = h("input", { cls: "lotto mono", id: "lotto-manual", value: curVal, oninput: function () { dr.lotto = li.value; if (dr.pickerOpen) syncPicker(); }, placeholder: "1,7,12,auto,auto,auto", "aria-label": t("manual1"), autocomplete: "off" });
       var prev = h("div", { cls: "preview", id: "lotto-preview" });
+      var pickerBox = h("div", { cls: "picker-wrap" });
+      pickerBox.hidden = !dr.pickerOpen;
+      function syncPicker() {
+        var selNums = parseFixedNums(li.value);
+        pickerBox.textContent = "";
+        pickerBox.appendChild(h("div", { cls: "picker-head" }, [
+          h("span", { text: t("pickerHint") + " (" + selNums.length + "/6)" }),
+          h("button", { cls: "mini", type: "button", text: t("pickerClear"), onclick: function () { li.value = "auto,auto,auto,auto,auto,auto"; dr.lotto = li.value; syncPicker(); } })
+        ]));
+        var gridEl = h("div", { cls: "picker-grid" });
+        for (var n = 1; n <= 45; n++) (function (num) {
+          var active = selNums.indexOf(num) >= 0;
+          gridEl.appendChild(h("button", { cls: "pball " + ballCls(num), type: "button", "aria-pressed": active ? "true" : "false", text: String(num), onclick: function () {
+            var cur = parseFixedNums(li.value);
+            var idx = cur.indexOf(num);
+            if (idx >= 0) cur.splice(idx, 1);
+            else if (cur.length < 6) cur.push(num);
+            li.value = formatManualNums(cur); dr.lotto = li.value;
+            syncPicker();
+          } }));
+        })(n);
+        pickerBox.appendChild(gridEl);
+      }
+      if (dr.pickerOpen) syncPicker();
       body.push(h("div", { cls: "manual" }, [li, btn(t("manual1"), "lotto_manual", " secondary", !avail)]));
-      body.push(h("div", { cls: "manual" }, [h("button", { cls: "btn lucky", type: "button", text: t("luckyPick"), onclick: function () {
-        var picks = pickLotto(acc);
-        li.value = picks.join(","); dr.lotto = li.value;
-        prev.textContent = ""; prev.classList.remove("rolling"); void prev.offsetWidth; prev.classList.add("rolling");
-        picks.forEach(function (p, i) { var b = ball(p); b.style.animationDelay = (i * 0.08) + "s"; prev.appendChild(b); });
-      } })]));
+      body.push(h("div", { cls: "manual" }, [
+        h("button", { cls: "btn lucky", type: "button", text: t("luckyPick"), onclick: function () {
+          var picks = pickLotto(acc);
+          li.value = picks.join(","); dr.lotto = li.value;
+          prev.textContent = ""; prev.classList.remove("rolling"); void prev.offsetWidth; prev.classList.add("rolling");
+          picks.forEach(function (p, i) { var b = ball(p); b.style.animationDelay = (i * 0.08) + "s"; prev.appendChild(b); });
+          if (dr.pickerOpen) syncPicker();
+        } }),
+        h("button", { cls: "btn secondary small", type: "button", text: dr.pickerOpen ? t("pickerClose") : t("pickerOpen"), onclick: function () {
+          dr.pickerOpen = !dr.pickerOpen; render();
+        } })
+      ]));
+      body.push(pickerBox);
       body.push(genOptions());
       body.push(prev);
       body.push(h("div", { cls: "hint", text: t("manualHint") + " · " + t("genNote") }));
@@ -732,15 +840,48 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   }
 
   // ------------------------------------------------------------ favorites
+  function runSimulate(numbers) {
+    openModal(t("simTitle"), [h("div", { cls: "hint", text: t("simLoading") })], t("close"), null, true);
+    getJson("api/simulate?rounds=50&numbers=" + encodeURIComponent(numbers))
+      .then(function (r) {
+        var nodes = [
+          h("div", { cls: "preview" }, String(r.numbers).split(",").map(function (x) { return x === "auto" ? h("span", { cls: "ball q", text: "?" }) : ball(x); })),
+          h("div", { cls: "sim-grid" }, [
+            h("div", { cls: "sim-stat" }, [h("b", { text: r.checked_rounds + t("round") }), h("span", { text: t("simRounds") })]),
+            h("div", { cls: "sim-stat" }, [h("b", { text: won(r.total_win) }), h("span", { text: t("statWin") })]),
+            h("div", { cls: "sim-stat" }, [h("b", { text: r.roi + "%" }), h("span", { text: t("statRatio") })])
+          ]),
+          h("div", { cls: "sim-ranks" }, [1, 2, 3, 4, 5].map(function (rk) {
+            var cnt = (r.rank_counts && r.rank_counts[String(rk)]) || 0;
+            return h("span", { cls: "sim-chip" + (cnt > 0 ? " hit" : ""), text: rk + t("simRank") + " " + cnt });
+          }))
+        ];
+        if ((r.hits || []).length) {
+          nodes.push(h("div", { cls: "rows" }, r.hits.slice(0, 5).map(function (ht) {
+            return h("div", { cls: "row won" }, [
+              h("span", { cls: "main", text: ht.round + t("round") + " · " + ht.matched.join(", ") + (ht.bonus ? " +B" : "") }),
+              h("span", { cls: "res r-gold", text: ht.rank + t("simRank") })
+            ]);
+          })));
+        } else {
+          nodes.push(h("div", { cls: "hint", text: t("simNone") }));
+        }
+        nodes.push(h("div", { cls: "hint", text: t("simNote") }));
+        openModal(t("simTitle"), nodes, t("close"), null, true);
+      })
+      .catch(function (e) { openModal(t("simTitle"), [t("simFail") + e.message], t("close"), null, true); });
+  }
   function favoritesCard(acc) {
     var favs = (settings && settings.favorites) || [], body = [];
-    var running = acc.last_action && acc.last_action.status === "running";
+    var running = acc.last_action && acc.last_action.status === "running", cdLeft = cooldownLeft(acc);
     if (!favs.length) body.push(h("div", { cls: "empty", text: t("favEmpty") }));
     else body.push(h("div", { cls: "rows" }, favs.map(function (f) {
       var isL = f.type === "lotto";
       var vis = isL ? String(f.numbers).split(",").map(function (x) { return x === "auto" ? h("span", { cls: "ball q", text: "?" }) : ball(x); }) : [ticket(f.group, f.digits)];
-      var off = running || (isL ? (!data.purchase_available || !data.lotto_enabled) : !data.pension_enabled);
+      var off = running || cdLeft > 0 || (isL ? (!data.purchase_available || !data.lotto_enabled) : !data.pension_enabled);
+      var simBtn = isL ? h("button", { cls: "mini", type: "button", text: t("simBtn"), title: t("simTitle"), "aria-label": t("simTitle"), onclick: function () { runSimulate(f.numbers); } }) : null;
       return h("div", { cls: "row fav" }, [h("span", { cls: "fname", text: f.name || (isL ? t("favLotto") : t("favPension")) }), h("span", { cls: "main" }, vis),
+        simBtn,
         h("button", { cls: "btn small", type: "button", disabled: off ? "disabled" : null, text: t("favBuy"), onclick: function () {
           ask(acc, isL ? "lotto_manual" : "pension_manual", isL ? { numbers: f.numbers } : { group: String(f.group), digits: f.digits });
         } }),
@@ -973,7 +1114,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   function load() {
     fetch("api/dashboard", { credentials: "same-origin", cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error(r.status === 403 ? t("ingressOnly") : "HTTP " + r.status); return r.json(); })
-      .then(function (j) { data = j; return Promise.all([loadSettings(), loadStats()]); })
+      .then(function (j) { data = j; syncCooldowns(j); return Promise.all([loadSettings(), loadStats()]); })
       .then(function () { render(); })
       .catch(function (e) { render(); document.getElementById("notices").appendChild(h("div", { cls: "notice err", text: t("loadFail") + e.message })); })
       .then(schedule);

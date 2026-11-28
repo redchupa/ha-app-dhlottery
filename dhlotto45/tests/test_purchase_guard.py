@@ -136,18 +136,22 @@ class TestInterAccountCooldownGuard(unittest.TestCase):
         guard.release("account_a", record_cooldown=True)  # 완료 시각: 203.0
 
         # 완료 직후 (0초 경과) B 시도 -> 차단 (약 20초 남음)
+        self.assertAlmostEqual(guard.get_remaining_cooldown("account_b"), 20.0, places=3)
+        self.assertEqual(guard.get_remaining_cooldown("account_a"), 0.0)
         with self.assertRaises(PurchaseCooldownError) as ctx0:
             guard.acquire("account_b")
         self.assertAlmostEqual(ctx0.exception.remaining_seconds, 20.0, places=3)
 
         # 19.5초 경과 -> 여전히 차단
         clock.advance(19.5)
+        self.assertAlmostEqual(guard.get_remaining_cooldown("account_b"), 0.5, places=3)
         with self.assertRaises(PurchaseCooldownError) as ctx1:
             guard.acquire("account_b")
         self.assertAlmostEqual(ctx1.exception.remaining_seconds, 0.5, places=3)
 
         # 정확히 20.0초 경과 -> B 허용!
         clock.advance(0.5)
+        self.assertEqual(guard.get_remaining_cooldown("account_b"), 0.0)
         guard.acquire("account_b")
         self.assertEqual(guard.active_username, "account_b")
         guard.release("account_b", record_cooldown=True)

@@ -163,5 +163,29 @@ for i in range(5):
     lg.info("line %d", i)
 check(rh.tail() == ["line 2", "line 3", "line 4"], "링버퍼 최근 N줄")
 
+# ------------------------------------------------ simulator
+print("[simulate_lotto_numbers]")
+sim_draws = [
+    {"round_no": 1205, "numbers": [1, 2, 3, 4, 5, 6], "bonus": 7},          # 1등 (6개)
+    {"round_no": 1204, "numbers": [1, 2, 3, 4, 5, 40], "bonus": 6},         # 2등 (5개 + 보너스)
+    {"round_no": 1203, "numbers": [1, 2, 3, 4, 5, 41], "bonus": 42},        # 3등 (5개)
+    {"round_no": 1202, "numbers": [1, 2, 3, 4, 41, 42], "bonus": 43},       # 4등 (4개)
+    {"round_no": 1201, "numbers": [1, 2, 3, 41, 42, 43], "bonus": 44},      # 5등 (3개)
+    {"round_no": 1200, "numbers": [10, 20, 30, 31, 32, 33], "bonus": 34},   # 낙첨
+]
+sr = F.simulate_lotto_numbers("1,2,3,4,5,6", sim_draws)
+check(sr["checked_rounds"] == 6 and sr["total_spend"] == 6000, "시뮬 회차·지출 집계")
+check(sr["best_rank"] == 1 and len(sr["hits"]) == 5, "1~5등 모두 적중")
+check(all(sr["rank_counts"][str(r)] == 1 for r in range(1, 6)), "등수별 각 1회")
+check(sr["total_win"] == 2_000_000_000 + 50_000_000 + 1_500_000 + 50_000 + 5_000, "추정 당첨금 합계")
+# 반자동(고정 3개 이상) 허용, 2개 이하 거부
+sr_semi = F.simulate_lotto_numbers("1,2,3,auto,auto,auto", sim_draws)
+check(sr_semi["fixed_count"] == 3 and sr_semi["rank_counts"]["5"] == 5, "반자동 3고정 시뮬")
+try:
+    F.simulate_lotto_numbers("1,2,auto,auto,auto,auto", sim_draws)
+    check(False, "고정 2개 이하는 거부돼야 함")
+except F.DashboardInputError:
+    check(True, "고정 2개 이하 거부")
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)
