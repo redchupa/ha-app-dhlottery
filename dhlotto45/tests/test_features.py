@@ -187,5 +187,53 @@ try:
 except F.DashboardInputError:
     check(True, "고정 2개 이하 거부")
 
+# ------------------------------------------------ number_stats (v2.10.0)
+print("[number_stats]")
+draws = [
+    {"round_no": 1252, "numbers": [1, 2, 3, 4, 5, 6], "bonus": 7},
+    {"round_no": 1251, "numbers": [1, 10, 20, 30, 40, 45], "bonus": 2},
+    {"round_no": 1250, "numbers": [1, 11, 21, 31, 41, 44], "bonus": 3},
+    {"round_no": 1249, "numbers": [9, 9]},                          # 잘못된 회차 → 건너뜀
+]
+ns = F.number_stats(draws, {1: 200, "2": 150}, window=3)
+by = {x["n"]: x for x in ns["numbers"]}
+check(ns["window"] == 3 and ns["latest_round"] == 1252 and ns["expected"] == 0.4, "범위·최신 회차·기대값")
+check(by[1]["count"] == 3 and by[1]["gap"] == 0 and by[1]["total"] == 200, "1번: 3회·최근·누적")
+check(by[2]["count"] == 1 and by[2]["total"] == 150, "보너스는 세지 않음·문자열 키 누적")
+check(by[45]["gap"] == 1 and by[44]["gap"] == 2 and by[8]["gap"] is None and by[8]["count"] == 0, "미출현 기간")
+check(ns["hot"][0] == 1 and ns["max_count"] == 3 and len(ns["hot"]) == 6, "가장 많이 나온 번호")
+check(ns["absent"][0]["gap"] is None and len(ns["absent"]) == 6, "장기 미출현(범위 내 미출현 우선)")
+check(F.number_stats([], None)["window"] == 0 and F.number_stats([], None)["max_count"] == 0, "데이터 없음")
+check(F.number_stats(draws, None, window=1)["window"] == 1, "범위 제한")
+
+# ------------------------------------------------ ledger export / import (v2.10.0)
+print("[ledger export/import]")
+good = {"key": "lotto:account_1:1252:A:1-2-3-4-5-6", "acct": "account_1", "kind": "buy", "game": "lotto",
+        "amount": 1000, "round": 1252, "info": "=HYPERLINK(\"x\")", "month": "2026-11", "ts": 1795800000}
+bad_list = [
+    dict(good, key="evil:account_1:x"),                 # 알 수 없는 key 형식
+    dict(good, acct="sampleid01"),                      # 별칭이 아닌 계정
+    dict(good, kind="refund"),
+    dict(good, amount=True),                            # bool 거부
+    dict(good, amount=-5),
+    dict(good, month="2026-13"),
+    {"key": "lotto:account_1:x"},                       # 필드 누락
+    "bad",
+]
+ok, skipped = F.validate_ledger_entries({"entries": [good] + bad_list})
+check(len(ok) == 1 and skipped == len(bad_list), "유효 항목만 통과")
+check(F.validate_ledger_entries([good])[0][0]["key"] == good["key"], "목록 형식도 허용")
+try:
+    F.validate_ledger_entries({"x": 1}); check(False, "entries 없으면 오류")
+except F.DashboardInputError:
+    check(True, "entries 없으면 오류")
+L3 = F.Ledger()
+now3 = datetime(2026, 11, 28, 10, 0, tzinfo=KST)
+check(L3.merge(ok, now3) == 1 and L3.merge(ok, now3) == 0, "가져오기 병합·중복 제외")
+csv_text = F.ledger_to_csv(L3.entries, {"account_1": "Account_1"})
+lines = csv_text.strip().splitlines()
+check(lines[0] == "date,month,account,game,kind,amount,round,info" and "Account_1" in lines[1], "CSV 헤더·계정 라벨")
+check("'=HYPERLINK" in lines[1], "CSV 수식 주입 방지")
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

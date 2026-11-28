@@ -308,6 +308,53 @@ textarea.diag { display: block; width: 100%; height: 240px; font-size: 11px; mar
 .sim-chip.hit { border-color: var(--gold); color: var(--gold); font-weight: 700; }
 .inline-btn { margin-left: 8px; vertical-align: middle; }
 @media (max-width: 520px) { .picker-grid { grid-template-columns: repeat(7, 1fr); } }
+/* number stats heatmap */
+.heat { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; margin: 10px 0 6px; }
+.heat .cell { position: relative; aspect-ratio: 1; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--chip); border: 1px solid var(--line); font-variant-numeric: tabular-nums; min-width: 0; }
+.heat .cell b { font-size: 14px; line-height: 1; }
+.heat .cell small { font-size: 9px; color: var(--muted); margin-top: 2px; }
+.heat .cell.top { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.heat-legend { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.heat-legend .scale { flex: 1; height: 8px; border-radius: 6px; }
+.numlist { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; }
+.numlist .gap { font-size: 11px; color: var(--muted); margin-right: 6px; }
+.btns.tight { display: flex; flex-wrap: wrap; gap: 6px; }
+.mt8 { margin-top: 8px; } .mt10 { margin-top: 10px; }
+/* receipt-style ticket */
+.receipt { position: relative; background: #fffdf6; color: #2a2a2a; border-radius: 6px; padding: 16px 16px 14px; margin-top: 4px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; box-shadow: 0 6px 18px rgba(0,0,0,.18);
+  -webkit-mask: radial-gradient(circle 7px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat, radial-gradient(circle 7px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+          mask: radial-gradient(circle 7px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat, radial-gradient(circle 7px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat; }
+.receipt + .receipt { margin-top: 14px; }
+.receipt .rh { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-bottom: 2px solid #2a2a2a; padding-bottom: 6px; }
+.receipt .rh b { font-size: 16px; letter-spacing: .02em; }
+.receipt .rh span { font-size: 11px; color: #666; }
+.receipt .rmeta { display: flex; justify-content: space-between; font-size: 11px; color: #555; margin: 6px 0 4px; }
+.receipt .rline { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px dashed #c9c2ae; font-size: 14px; }
+.receipt .rline:last-of-type { border-bottom: 0; }
+.receipt .slot { width: 18px; font-weight: 800; }
+.receipt .mode { width: 46px; font-size: 11px; color: #666; }
+.receipt .nums { flex: 1; letter-spacing: .08em; font-weight: 700; word-spacing: 4px; }
+.receipt .nums .q { color: #999; }
+.receipt .rfoot { display: flex; justify-content: space-between; border-top: 2px solid #2a2a2a; margin-top: 6px; padding-top: 6px; font-size: 13px; font-weight: 800; }
+.receipt .barcode { height: 34px; margin-top: 10px; border-radius: 2px; }
+.receipt .rnote { font-size: 10px; color: #777; text-align: center; margin-top: 4px; }
+/* mobile quick-jump bar */
+#qnav { display: none; }
+.card { scroll-margin-top: 150px; }
+@media (max-width: 720px) {
+  #qnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; gap: 4px; overflow-x: auto; padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--card) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); scrollbar-width: none; }
+  #qnav::-webkit-scrollbar { display: none; }
+  #qnav button { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 54px; padding: 4px 6px; border: 0; border-radius: 10px;
+    background: transparent; color: var(--ink); font-size: 10px; cursor: pointer; }
+  #qnav button img { width: 26px; height: 26px; }
+  #qnav button.top { font-size: 18px; justify-content: center; }
+  #qnav button:active { background: var(--chip); }
+  main { padding-bottom: 86px; }
+  footer { padding-bottom: 90px; }
+}
 footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px 16px 30px; }
 @media (max-width: 900px) { .hero { grid-template-columns: 1.1fr 1fr; } .hero-art { display: none; } }
 @media (max-width: 720px) { .hero { grid-template-columns: 1fr; } .hero-right { align-items: flex-start; } .hero-balls { justify-content: flex-start; } }
@@ -332,6 +379,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   <div class="grid" id="grid"></div>
 </main>
 <footer id="footer"></footer>
+<nav id="qnav" aria-label="quick jump"></nav>
 
 <div class="modal-bg" id="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
   <div class="modal">
@@ -391,6 +439,15 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       genOdd: "홀짝 균형", genSum: "합계 100~175", genSeq: "3연속 제외", genNote: "어떤 방식이든 당첨 확률은 같습니다 (재미용).", saveErr: "저장 실패: ",
       relogin: "🔄 재로그인", reloginBusy: "로그인 중…", reloginOk: "세션을 갱신했습니다.", reloginFail: "재로그인 실패: ",
       cooldownWait: "⏳ 계정 간 보안 대기: ", cooldownSec: "초 후 구매 가능",
+      receipt: "구매 용지", rcptLotto: "로또 복권 6/45", rcptPension: "연금 복권 720+", rcptDraw: "추첨", rcptTotal: "합계", rcptGames: "게임",
+      rcptNote: "화면용 확인 용지입니다 (실제 복권 아님)", mAuto: "자동", mManual: "수동", mSemi: "반자동", rcptNone: "이번 회차 구매 내역이 없습니다.",
+      numstats: "번호 통계", nsFreq: "출현 빈도", nsGap: "미출현 기간", nsRounds: "최근", nsHot: "많이 나온 번호", nsCold: "적게 나온 번호",
+      nsAbsent: "오래 안 나온 번호", nsTimes: "회", nsAgo: "회 전", nsNever: "범위 밖", nsExpected: "평균 기대", nsTotal: "누적",
+      nsNote: "보너스 번호 제외 · 과거 통계일 뿐 다음 추첨 확률은 모든 번호가 같습니다.", nsLoading: "통계를 불러오는 중…", nsFail: "번호 통계를 불러오지 못했습니다: ",
+      exportCsv: "⬇ CSV 내보내기", exportJson: "⬇ 백업(JSON)", importJson: "⬆ 백업 가져오기", importOk: "가져오기 완료: 추가 ", importSkip: "건, 건너뜀 ", importFail: "가져오기 실패: ",
+      exportFail: "내보내기 실패: ", qTop: "맨 위로",
+      q_summary: "요약", q_buy: "구매", q_receipt: "용지", q_favorites: "즐겨찾기", q_lotto_current: "로또", q_lotto_prev: "지난 로또",
+      q_pension_current: "연금", q_pension_prev: "지난 연금", q_winning: "당첨번호", q_numstats: "번호통계", q_stats: "지출통계", q_auto: "자동",
       pickerOpen: "🎱 번호판", pickerClose: "🎱 번호판 닫기", pickerClear: "초기화", pickerHint: "1~45 중 최대 6개 선택 (남은 칸은 자동)",
       simBtn: "🔍", simTitle: "과거 당첨 시뮬레이션", simLoading: "최근 50회차 당첨 이력을 조회 중…", simNone: "최근 50회차 중 5등 이상 당첨 이력이 없습니다.",
       simFail: "시뮬레이션 실패: ", simRounds: "검사 회차", simRank: "등", simNote: "1~3등은 추정 평균 상금 기준이며, 과거 결과는 미래 당첨을 보장하지 않습니다." },
@@ -434,6 +491,15 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       genOdd: "Odd/even balance", genSum: "Sum 100-175", genSeq: "No 3 in a row", genNote: "Every method has the same odds (just for fun).", saveErr: "Save failed: ",
       relogin: "🔄 Re-login", reloginBusy: "Signing in…", reloginOk: "Session refreshed.", reloginFail: "Re-login failed: ",
       cooldownWait: "⏳ Inter-account cooldown: ", cooldownSec: "s left",
+      receipt: "Ticket slip", rcptLotto: "LOTTO 6/45", rcptPension: "PENSION 720+", rcptDraw: "Draw", rcptTotal: "Total", rcptGames: "games",
+      rcptNote: "On-screen slip for checking only (not a real ticket)", mAuto: "Auto", mManual: "Manual", mSemi: "Semi", rcptNone: "No tickets for this round.",
+      numstats: "Number stats", nsFreq: "Frequency", nsGap: "Rounds absent", nsRounds: "Last", nsHot: "Most drawn", nsCold: "Least drawn",
+      nsAbsent: "Long absent", nsTimes: "x", nsAgo: " ago", nsNever: "out of range", nsExpected: "Expected", nsTotal: "All-time",
+      nsNote: "Bonus numbers excluded · past statistics only; every number has the same odds next draw.", nsLoading: "Loading statistics…", nsFail: "Could not load number stats: ",
+      exportCsv: "⬇ Export CSV", exportJson: "⬇ Backup (JSON)", importJson: "⬆ Import backup", importOk: "Imported: added ", importSkip: ", skipped ", importFail: "Import failed: ",
+      exportFail: "Export failed: ", qTop: "Top",
+      q_summary: "Summary", q_buy: "Buy", q_receipt: "Slip", q_favorites: "Favorites", q_lotto_current: "Lotto", q_lotto_prev: "Last lotto",
+      q_pension_current: "Pension", q_pension_prev: "Last pension", q_winning: "Winning", q_numstats: "Numbers", q_stats: "Spending", q_auto: "Auto",
       pickerOpen: "🎱 Number Pad", pickerClose: "🎱 Hide Pad", pickerClear: "Clear", pickerHint: "Pick up to 6 numbers (rest filled with auto)",
       simBtn: "🔍", simTitle: "Past Draw Simulation", simLoading: "Checking last 50 draws…", simNone: "No 5th-prize or higher matches in the last 50 draws.",
       simFail: "Simulation failed: ", simRounds: "Draws", simRank: " prize", simNote: "1st-3rd prizes use average estimates; past results do not predict future draws." }
@@ -456,14 +522,15 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     { id: "aurora", g: "gNight", ko: "오로라", en: "Aurora", sw: "linear-gradient(135deg,#0f766e,#7c3aed)" },
     { id: "galaxy", g: "gNight", ko: "은하수 소원", en: "Galaxy Wish", sw: "linear-gradient(135deg,#1e1b4b,#be185d)" }
   ];
-  var DEFAULT_ORDER = ["summary", "buy", "favorites", "lotto_current", "lotto_prev", "pension_current", "pension_prev", "winning", "stats", "auto"];
+  var DEFAULT_ORDER = ["summary", "buy", "receipt", "favorites", "lotto_current", "lotto_prev", "pension_current", "pension_prev", "winning", "numstats", "stats", "auto"];
   var CARD_NAMES = { summary: "summary", buy: "buy", favorites: "favorites", lotto_current: "lottoCur", lotto_prev: "lottoPrev",
-    pension_current: "penCur", pension_prev: "penPrev", winning: "winning", stats: "stats", auto: "auto" };
+    pension_current: "penCur", pension_prev: "penPrev", winning: "winning", stats: "stats", auto: "auto", receipt: "receipt", numstats: "numstats" };
 
   var prefs = {};
   try { prefs = JSON.parse(document.getElementById("dhl-prefs").textContent || "{}") || {}; } catch (e) { prefs = {}; }
   var data = null, current = null, timer = null, saveTimer = null, saveState = "";
   var settings = null, stats = null, statsScope = "all", modalOk = null;
+  var numStats = null, numStatsAt = 0, numStatsErr = "", nsRounds = 50, nsView = "freq";
   var gen = { mode: "random", odd: false, sum: false, seq: false };
   var autoDraft = { action: "lotto_auto_1", time: "09:00", days: [5], account: "all" };
   var luckyIdx = Math.floor(Math.random() * 5);
@@ -524,7 +591,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   }
   var ART = { summary: "icon_wallet", buy: "icon_buy", favorites: "icon_favorite", lotto_current: "icon_lotto",
     lotto_prev: "icon_history", pension_current: "icon_pension", pension_prev: "icon_history", winning: "icon_winning",
-    stats: "icon_stats", auto: "icon_auto" };
+    stats: "icon_stats", auto: "icon_auto", receipt: "icon_history", numstats: "icon_numstats" };
   // Decorative image; if it fails to load, fall back to the emoji (or nothing).
   function art(name, cls, fallback) {
     var img = h("img", { cls: cls, src: "static/img/" + name + ".webp", alt: "", decoding: "async" });
@@ -911,6 +978,126 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   }
 
   // ------------------------------------------------------------ stats
+
+  // ------------------------------------------------------------ download helper
+  function download(url) {
+    fetch(url, { credentials: "same-origin", cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      var cd = r.headers.get("Content-Disposition") || "", m = /filename="([^"]+)"/.exec(cd);
+      return r.blob().then(function (b) { return { blob: b, name: m ? m[1] : "dhlotto45-ledger" }; });
+    }).then(function (x) {
+      var a = h("a", { href: URL.createObjectURL(x.blob), download: x.name });
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    }).catch(function (e) { toast(t("exportFail") + e.message, "err"); });
+  }
+
+  // ------------------------------------------------------------ receipt-style slip
+  function modeName(m) { m = String(m || ""); return m.indexOf("semi") >= 0 ? t("mSemi") : m.indexOf("manual") >= 0 ? t("mManual") : t("mAuto"); }
+  function barcode(seed) {
+    var x = 0, stops = [], pos = 0;
+    for (var i = 0; i < seed.length; i++) x = (x * 31 + seed.charCodeAt(i)) >>> 0;
+    while (pos < 100) {
+      x = (x * 1103515245 + 12345) >>> 0;
+      var w = 0.6 + (x % 7) * 0.35, gapw = 0.5 + ((x >> 5) % 5) * 0.4;
+      stops.push("#2a2a2a " + pos.toFixed(2) + "%", "#2a2a2a " + (pos + w).toFixed(2) + "%", "transparent " + (pos + w).toFixed(2) + "%", "transparent " + (pos + w + gapw).toFixed(2) + "%");
+      pos += w + gapw;
+    }
+    var el = h("div", { cls: "barcode" }); el.style.background = "linear-gradient(90deg," + stops.join(",") + ")"; return el;
+  }
+  function drawDate(dow, hh, mm) {
+    var d = new Date(Date.now() + nextDraw(dow, hh, mm) + 9 * 3600e3);
+    function p(x) { return (x < 10 ? "0" : "") + x; }
+    return d.getUTCFullYear() + "." + p(d.getUTCMonth() + 1) + "." + p(d.getUTCDate()) + " " + p(hh) + ":" + p(mm);
+  }
+  function receiptCard(acc) {
+    var body = [], lines = [], round = 0;
+    for (var i = 1; i <= 5; i++) {
+      var g = at(acc, "lotto45_game_" + i);
+      if (!(g.numbers || []).length) continue;
+      round = g.round_no || round;
+      lines.push(h("div", { cls: "rline" }, [h("span", { cls: "slot", text: g.slot || String.fromCharCode(64 + i) }), h("span", { cls: "mode", text: modeName(g.mode) }),
+        h("span", { cls: "nums", text: g.numbers.map(function (n) { return (n < 10 ? "0" : "") + n; }).join(" ") })]));
+    }
+    if (data.lotto_enabled && lines.length) {
+      body.push(h("div", { cls: "receipt" }, [h("div", { cls: "rh" }, [h("b", { text: t("rcptLotto") }), h("span", { text: acc.label })]),
+        h("div", { cls: "rmeta" }, [h("span", { text: round + t("round") }), h("span", { text: t("rcptDraw") + " " + drawDate(6, 20, 35) })])].concat(lines).concat([
+        h("div", { cls: "rfoot" }, [h("span", { text: t("rcptTotal") + " · " + lines.length + t("rcptGames") }), h("span", { text: won(lines.length * 1000) })]),
+        barcode(acc.id + ":L:" + round + ":" + lines.length), h("div", { cls: "rnote", text: t("rcptNote") })])));
+    }
+    var pa = at(acc, "pension720_this_round"), pg = pa.games || [];
+    if (data.pension_enabled && pg.length) {
+      body.push(h("div", { cls: "receipt" }, [h("div", { cls: "rh" }, [h("b", { text: t("rcptPension") }), h("span", { text: acc.label })]),
+        h("div", { cls: "rmeta" }, [h("span", { text: (pa.round_no || "") + t("round") }), h("span", { text: t("rcptDraw") + " " + drawDate(4, 19, 5) })])].concat(
+        pg.slice(0, 20).map(function (g, k) {
+          return h("div", { cls: "rline" }, [h("span", { cls: "slot", text: String(k + 1) }), h("span", { cls: "mode", text: (g.group || "-") + t("groupSuffix") }),
+            h("span", { cls: "nums", text: String(g.number || "").split("").join(" ") })]);
+        })).concat([h("div", { cls: "rfoot" }, [h("span", { text: t("rcptTotal") + " · " + pg.length + t("tickets") }), h("span", { text: won(pg.length * 1000) })]),
+        barcode(acc.id + ":P:" + pa.round_no + ":" + pg.length), h("div", { cls: "rnote", text: t("rcptNote") })])));
+    }
+    if (!body.length) body.push(emptyArt(t("rcptNone")));
+    return card("receipt", "🧾", t("receipt"), "", body);
+  }
+
+  // ------------------------------------------------------------ number stats heatmap
+  function loadNumStats(force) {
+    if (!data || !data.lotto_enabled) return Promise.resolve();
+    if (!force && numStats && numStats.window === nsRounds && Date.now() - numStatsAt < 600000) return Promise.resolve();
+    return getJson("api/number-stats?rounds=" + nsRounds).then(function (j) { numStats = j; numStatsAt = Date.now(); numStatsErr = ""; })
+      .catch(function (e) { numStatsErr = e.message; });
+  }
+  function numStatsCard() {
+    var body = [h("div", { cls: "btns tight" }, [
+      h("div", { cls: "seg" }, [50, 100].map(function (r) {
+        return h("button", { type: "button", "aria-pressed": nsRounds === r ? "true" : "false", text: t("nsRounds") + " " + r + t("round"),
+          onclick: function () { nsRounds = r; loadNumStats(true).then(render); } });
+      })),
+      h("div", { cls: "seg" }, [["freq", t("nsFreq")], ["gap", t("nsGap")]].map(function (o) {
+        return h("button", { type: "button", "aria-pressed": nsView === o[0] ? "true" : "false", text: o[1], onclick: function () { nsView = o[0]; render(); } });
+      }))])];
+    if (!numStats) {
+      body.push(h("div", { cls: "empty", text: numStatsErr ? t("nsFail") + numStatsErr : t("nsLoading") }));
+      return card("numstats", "🔢", t("numstats"), "", body);
+    }
+    var ns = numStats, max = Math.max(1, ns.max_count), win = Math.max(1, ns.window);
+    var hot = ns.hot.slice(0, 6);
+    body.push(h("div", { cls: "heat" }, ns.numbers.map(function (x) {
+      var v = nsView === "freq" ? x.count / max : (x.gap === null ? 1 : x.gap / win);
+      var color = nsView === "freq" ? "var(--gold)" : "#3fa9de";
+      var c = h("div", { cls: "cell" + (nsView === "freq" && hot.indexOf(x.n) >= 0 ? " top" : ""),
+        title: x.n + " · " + x.count + t("nsTimes") + " · " + (x.gap === null ? t("nsNever") : x.gap + t("nsAgo")) + (x.total ? " · " + t("nsTotal") + " " + x.total + t("nsTimes") : "") },
+        [h("b", { text: String(x.n) }), h("small", { text: nsView === "freq" ? x.count + t("nsTimes") : (x.gap === null ? "—" : x.gap + t("nsAgo")) })]);
+      c.style.background = "color-mix(in srgb, " + color + " " + Math.round(8 + v * 72) + "%, var(--chip))";
+      return c;
+    })));
+    var sc = h("span", { cls: "scale" });
+    sc.style.background = "linear-gradient(90deg, var(--chip), " + (nsView === "freq" ? "var(--gold)" : "#3fa9de") + ")";
+    body.push(h("div", { cls: "heat-legend" }, [h("span", { text: nsView === "freq" ? "0" + t("nsTimes") : "0" + t("nsAgo") }), sc,
+      h("span", { text: nsView === "freq" ? max + t("nsTimes") : win + t("nsAgo") + "+" })]));
+    body.push(h("div", { cls: "sect", text: "🔥 " + t("nsHot") }));
+    body.push(h("div", { cls: "numlist" }, balls(ns.hot)));
+    body.push(h("div", { cls: "sect", text: "🧊 " + t("nsCold") }));
+    body.push(h("div", { cls: "numlist" }, balls(ns.cold)));
+    body.push(h("div", { cls: "sect", text: "⏳ " + t("nsAbsent") }));
+    body.push(h("div", { cls: "numlist" }, ns.absent.map(function (a) {
+      return h("span", { cls: "numlist" }, [ball(a.n), h("span", { cls: "gap", text: a.gap === null ? t("nsNever") : a.gap + t("nsAgo") })]);
+    })));
+    body.push(h("div", { cls: "hint mt8", text: t("nsExpected") + " " + ns.expected + t("nsTimes") + " · " + t("nsNote") }));
+    return card("numstats", "🔢", t("numstats"), (ns.latest_round ? ns.latest_round + t("round") + " · " : "") + t("nsRounds") + " " + ns.window + t("round"), body);
+  }
+
+  // ------------------------------------------------------------ mobile quick-jump bar
+  function renderQnav(ids) {
+    var nav = document.getElementById("qnav"); if (!nav) return;
+    nav.textContent = "";
+    ids.forEach(function (id) {
+      var b = h("button", { type: "button", "aria-label": t("q_" + id), onclick: function () {
+        var el = document.querySelector('[data-card="' + id + '"]'); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } }, [ART[id] ? art(ART[id], "", "•") : h("span", { text: "•" }), h("span", { text: t("q_" + id) })]);
+      nav.appendChild(b);
+    });
+    nav.appendChild(h("button", { cls: "top", type: "button", "aria-label": t("qTop"), title: t("qTop"), text: "▲", onclick: function () { window.scrollTo({ top: 0, behavior: "smooth" }); } }));
+  }
   function statsCard() {
     var body = [h("div", { cls: "seg" }, [["all", t("statAll")], ["acc", t("statThis")]].map(function (o) {
       return h("button", { type: "button", "aria-pressed": statsScope === o[0] ? "true" : "false", text: o[1], onclick: function () { statsScope = o[0]; loadStats().then(render); } });
@@ -940,6 +1127,18 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       }
     }
     body.push(h("div", { cls: "hint", text: t("statNote") }));
+    var file = h("input", { type: "file", accept: ".json,application/json", hidden: "hidden", onchange: function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      f.text().then(function (txt) { return postJson("api/ledger/import", JSON.parse(txt)); })
+        .then(function (j) { toast(t("importOk") + j.added + t("importSkip") + j.skipped, "ok"); return loadStats(); })
+        .then(render)
+        .catch(function (err) { toast(t("importFail") + err.message, "err"); });
+      e.target.value = "";
+    } });
+    body.push(h("div", { cls: "btns tight mt10" }, [
+      h("button", { cls: "btn secondary small", type: "button", text: t("exportCsv"), onclick: function () { download("api/ledger/export?format=csv"); } }),
+      h("button", { cls: "btn secondary small", type: "button", text: t("exportJson"), onclick: function () { download("api/ledger/export?format=json"); } }),
+      h("button", { cls: "btn secondary small", type: "button", text: t("importJson"), onclick: function () { file.click(); } }), file]));
     return card("stats", "📊", t("stats"), "", body);
   }
 
@@ -1096,14 +1295,19 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       var v = st(acc, p[0]); if (v && v !== "없음") notes.appendChild(h("div", { cls: "notice err", text: t(p[1]) + ": " + v }));
     });
     var builders = { summary: summaryCard, buy: buyCard, favorites: favoritesCard, lotto_current: lottoCurrentCard, lotto_prev: lottoPrevCard,
-      pension_current: pensionCurrentCard, pension_prev: pensionPrevCard, winning: winningCard, stats: statsCard, auto: autoCard };
+      pension_current: pensionCurrentCard, pension_prev: pensionPrevCard, winning: winningCard, stats: statsCard, auto: autoCard,
+      receipt: receiptCard, numstats: numStatsCard };
+    var shown = [];
     var hidden = prefs.hidden_cards || [];
     (prefs.card_order || DEFAULT_ORDER).forEach(function (id) {
       if (hidden.indexOf(id) >= 0 || !builders[id]) return;
       if ((id === "lotto_current" || id === "lotto_prev") && !data.lotto_enabled) return;
       if ((id === "pension_current" || id === "pension_prev") && !data.pension_enabled) return;
+      if (id === "numstats" && !data.lotto_enabled) return;
       grid.appendChild(builders[id](acc));
+      shown.push(id);
     });
+    renderQnav(shown);
   }
 
   function schedule() {
@@ -1114,7 +1318,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   function load() {
     fetch("api/dashboard", { credentials: "same-origin", cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error(r.status === 403 ? t("ingressOnly") : "HTTP " + r.status); return r.json(); })
-      .then(function (j) { data = j; syncCooldowns(j); return Promise.all([loadSettings(), loadStats()]); })
+      .then(function (j) { data = j; syncCooldowns(j); return Promise.all([loadSettings(), loadStats(), loadNumStats(false)]); })
       .then(function () { render(); })
       .catch(function (e) { render(); document.getElementById("notices").appendChild(h("div", { cls: "notice err", text: t("loadFail") + e.message })); })
       .then(schedule);

@@ -316,6 +316,18 @@ class Ledger:
         self.prune(now)
         return True
 
+    def merge(self, entries, now: datetime) -> int:
+        """검증된 항목을 key 기준으로 합친다(이미 있는 key 는 그대로). 추가된 개수 반환."""
+        added = 0
+        for e in entries or []:
+            if e["key"] not in self._keys:
+                self.entries.append(dict(e))
+                self._keys.add(e["key"])
+                added += 1
+        self.entries.sort(key=lambda x: x.get("ts", 0))
+        self.prune(now)
+        return added
+
     def prune(self, now: datetime) -> None:
         cutoff = (now.replace(day=1) - timedelta(days=31 * LEDGER_MONTHS)).strftime("%Y-%m")
         kept = [e for e in self.entries if e.get("month", "") >= cutoff][-LEDGER_MAX:]
@@ -522,6 +534,104 @@ def simulate_lotto_numbers(numbers_text: str, draws: list) -> dict:
         "best_rank": best_rank,
         "hits": hits,
     }
+
+
+# ---------------------------------------------------------------- number stats (v2.10.0)
+def number_stats(draws, cumulative=None, window: int = 50) -> dict:
+    """최근 window 회차의 번호별 출현 횟수와 미출현 기간(번호 1~45, 보너스 제외).
+
+    draws: 최신 회차가 먼저인 [{"round_no", "numbers"}]. gap 은 마지막 출현 이후 지난 회차 수
+    (0 = 가장 최근 회차에 나옴, None = 조회 범위 안에서 한 번도 안 나옴).
+    """
+    rows = []
+    for d in draws or []:
+        if not isinstance(d, dict):
+            continue
+        nums = [int(n) for n in (d.get("numbers") or []) if str(n).isdigit() and 1 <= int(n) <= 45][:6]
+        if len(nums) == 6:
+            rows.append({"round": _safe_int(d.get("round_no") or d.get("round")), "numbers": nums})
+        if len(rows) >= window:
+            break
+    count = {n: 0 for n in range(1, 46)}
+    gap = {n: None for n in range(1, 46)}
+    for idx, r in enumerate(rows):
+        for n in r["numbers"]:
+            count[n] += 1
+            if gap[n] is None:
+                gap[n] = idx
+    cum = cumulative if isinstance(cumulative, dict) else {}
+    numbers = [{"n": n, "count": count[n], "gap": gap[n], "total": _safe_int(cum.get(n, cum.get(str(n), 0)))}
+               for n in range(1, 46)]
+    by_hot = sorted(numbers, key=lambda x: (-x["count"], x["n"]))
+    by_cold = sorted(numbers, key=lambda x: (x["count"], x["n"]))
+    absent_key = lambda x: (-(x["gap"] if x["gap"] is not None else len(rows) + 1), x["n"])  # noqa: E731
+    return {
+        "window": len(rows),
+        "latest_round": rows[0]["round"] if rows else 0,
+        "expected": round(len(rows) * 6 / 45, 1),
+        "max_count": max(count.values()) if rows else 0,
+        "numbers": numbers,
+        "hot": [x["n"] for x in by_hot[:6]],
+        "cold": [x["n"] for x in by_cold[:6]],
+        "absent": [{"n": x["n"], "gap": x["gap"]} for x in sorted(numbers, key=absent_key)[:6]],
+    }
+
+
+# ---------------------------------------------------------------- ledger export / import (v2.10.0)
+LEDGER_IMPORT_MAX = 10000
+_LEDGER_KEY_RE = re.compile(r"^(lotto|lotto-win|pension|pension-win):account_\d{1,2}:[A-Za-z0-9:\-_.]{1,90}$")
+_ACCT_RE = re.compile(r"^account_\d{1,2}$")
+_MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
+def validate_ledger_entries(raw) -> tuple:
+    """가져오기 파일의 원장 항목 검증 → (유효 항목 목록, 건너뛴 개수). 형식이 다르면 건너뛴다."""
+    items = raw.get("entries") if isinstance(raw, dict) else raw
+    if not isinstance(items, list):
+        raise DashboardInputError("백업 파일 형식이 올바르지 않습니다 (entries 목록이 없음).")
+    ok, skipped = [], 0
+    for e in items[:LEDGER_IMPORT_MAX]:
+        try:
+            if not isinstance(e, dict):
+                raise ValueError
+            key, acct, month = str(e["key"]), str(e["acct"]), str(e["month"])
+            kind, game = e["kind"], e["game"]
+            amount, rnd, ts = e["amount"], e["round"], e["ts"]
+            if not (_LEDGER_KEY_RE.match(key) and _ACCT_RE.match(acct) and _MONTH_RE.match(month)):
+                raise ValueError
+            if kind not in ("buy", "win") or game not in ("lotto", "pension"):
+                raise ValueError
+            if any(isinstance(v, bool) or not isinstance(v, int) for v in (amount, rnd, ts)):
+                raise ValueError
+            if not (0 <= amount <= 10_000_000_000 and 0 <= rnd <= 100_000 and 0 <= ts <= 4_102_444_800):
+                raise ValueError
+            ok.append({"key": key, "acct": acct, "kind": kind, "game": game, "amount": amount, "round": rnd,
+                       "info": _clean_text(e.get("info"), 40), "month": month, "ts": ts})
+        except (KeyError, TypeError, ValueError):
+            skipped += 1
+    skipped += max(0, len(items) - LEDGER_IMPORT_MAX)
+    return ok, skipped
+
+
+def _csv_cell(value) -> str:
+    """스프레드시트 수식 주입 방지(=, +, -, @ 로 시작하면 ' 를 붙임)."""
+    s = str(value if value is not None else "")
+    return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r") else s
+
+
+def ledger_to_csv(entries, labels=None) -> str:
+    """원장 → CSV 문자열(엑셀 한글용 BOM 은 응답에서 붙임)."""
+    import csv
+    import io
+    labels = labels or {}
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\r\n")
+    w.writerow(["date", "month", "account", "game", "kind", "amount", "round", "info"])
+    for e in sorted(entries or [], key=lambda x: x.get("ts", 0)):
+        dt = datetime.fromtimestamp(int(e.get("ts") or 0), KST).strftime("%Y-%m-%d %H:%M")
+        w.writerow([_csv_cell(v) for v in (dt, e.get("month"), labels.get(e.get("acct"), e.get("acct")),
+                                           e.get("game"), e.get("kind"), e.get("amount"), e.get("round"), e.get("info"))])
+    return buf.getvalue()
 
 
 def now_kst() -> datetime:

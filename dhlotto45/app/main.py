@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.8.0
+Lotto 45 Add-on Main Application v2.10.0
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -113,7 +113,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.9.0"
+APP_VERSION = "2.10.0"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -2432,26 +2432,59 @@ async def api_simulate(request: Request, numbers: str = "", rounds: int = 50):
     except DashboardInputError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    now = time.monotonic()
-    draws = _sim_history_cache["draws"]
-    if not draws or (now - _sim_history_cache["ts"]) > _SIM_CACHE_TTL:
-        async with _sim_history_lock:
-            now = time.monotonic()
-            if not _sim_history_cache["draws"] or (now - _sim_history_cache["ts"]) > _SIM_CACHE_TTL:
-                try:
-                    async with DhMobileApiClient() as mobile:
-                        fetched = await mobile.async_get_round_history(100)
-                    _sim_history_cache["draws"] = fetched
-                    _sim_history_cache["ts"] = time.monotonic()
-                except Exception as e:  # noqa: BLE001
-                    raise HTTPException(status_code=502, detail=f"과거 당첨번호를 불러오지 못했습니다: {str(e)[:120]}")
-            draws = _sim_history_cache["draws"]
+    draws = await _round_history()
 
     try:
         result = FT.simulate_lotto_numbers(numbers, draws[:rounds])
     except DashboardInputError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return JSONResponse(result, headers=_SECURITY_HEADERS)
+
+
+async def _round_history() -> list:
+    """최근 100회차 당첨번호(최신순). 1시간 메모리 캐시, 실패 시 502."""
+    now = time.monotonic()
+    if _sim_history_cache["draws"] and (now - _sim_history_cache["ts"]) <= _SIM_CACHE_TTL:
+        return _sim_history_cache["draws"]
+    async with _sim_history_lock:
+        now = time.monotonic()
+        if not _sim_history_cache["draws"] or (now - _sim_history_cache["ts"]) > _SIM_CACHE_TTL:
+            try:
+                async with DhMobileApiClient() as mobile:
+                    fetched = await mobile.async_get_round_history(100)
+                _sim_history_cache["draws"] = fetched
+                _sim_history_cache["ts"] = time.monotonic()
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(status_code=502, detail=f"과거 당첨번호를 불러오지 못했습니다: {str(e)[:120]}")
+        return _sim_history_cache["draws"]
+
+
+_cum_stats_cache: dict = {"ts": 0.0, "stats": {}}
+_CUM_CACHE_TTL = 6 * 3600.0
+
+
+async def _cumulative_stats() -> dict:
+    """번호별 전체 누적 출현 횟수(6시간 캐시). 실패해도 빈 값으로 계속한다."""
+    now = time.monotonic()
+    if _cum_stats_cache["stats"] and (now - _cum_stats_cache["ts"]) <= _CUM_CACHE_TTL:
+        return _cum_stats_cache["stats"]
+    try:
+        async with DhMobileApiClient() as mobile:
+            _cum_stats_cache["stats"] = await mobile.async_get_cumulative_number_stats()
+            _cum_stats_cache["ts"] = time.monotonic()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[NUMSTATS] 누적 통계 조회 실패(생략): {e}")
+    return _cum_stats_cache["stats"]
+
+
+@app.get("/api/number-stats")
+async def api_number_stats(request: Request, rounds: int = 50):
+    """번호 통계 심화: 최근 N회(10~100) 번호별 출현 횟수·미출현 기간 + 전체 누적."""
+    _require_ingress(request)
+    rounds = max(10, min(100, int(rounds)))
+    draws = await _round_history()
+    data = FT.number_stats(draws, await _cumulative_stats(), rounds)
+    return JSONResponse(data, headers=_SECURITY_HEADERS)
 
 
 # ================================================================ v2.7.0 확장 기능
@@ -2762,6 +2795,51 @@ async def api_stats(request: Request, account: str = ""):
     labels = {aid: lb for aid, lb in _aliases().values()}
     data["labels"] = labels
     return JSONResponse(data, headers=_SECURITY_HEADERS)
+
+
+_LEDGER_IMPORT_MAX_BODY = 2 * 1024 * 1024
+
+
+@app.get("/api/ledger/export")
+async def api_ledger_export(request: Request, format: str = "csv"):
+    """원장(구매·당첨 기록) 내려받기: csv(엑셀용) 또는 json(가져오기용 백업)."""
+    _require_ingress(request)
+    import json as _json
+    from fastapi.responses import Response
+    entries = list(_get_ledger().entries)
+    stamp = FT.now_kst().strftime("%Y%m%d")
+    if format == "json":
+        body = _json.dumps({"app": "dhlotto45", "version": APP_VERSION, "entries": entries}, ensure_ascii=False)
+        media, name = "application/json; charset=utf-8", f"dhlotto45-ledger-{stamp}.json"
+    else:
+        labels = {aid: lb for aid, lb in _aliases().values()}
+        body = "\ufeff" + FT.ledger_to_csv(entries, labels)
+        media, name = "text/csv; charset=utf-8", f"dhlotto45-ledger-{stamp}.csv"
+    headers = dict(_SECURITY_HEADERS)
+    headers["Content-Disposition"] = f'attachment; filename="{name}"'
+    return Response(content=body.encode("utf-8"), media_type=media, headers=headers)
+
+
+@app.post("/api/ledger/import")
+async def api_ledger_import(request: Request):
+    """JSON 백업 가져오기. Ingress + CSRF 필수, 항목마다 형식 검증 후 key 기준으로 합친다."""
+    _require_ingress(request)
+    _require_csrf(request)
+    body = await _read_json_body(request, _LEDGER_IMPORT_MAX_BODY)
+    try:
+        entries, skipped = FT.validate_ledger_entries(body)
+    except DashboardInputError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    async with _feature_lock:
+        led = _get_ledger()
+        added = led.merge(entries, FT.now_kst())
+        try:
+            _write_json(FT.LEDGER_FILE, led.entries)
+        except OSError as e:
+            logger.error(f"[FEAT] 원장 저장 실패: {e}")
+            raise HTTPException(status_code=500, detail="기록을 저장하지 못했습니다.")
+    logger.info(f"[FEAT] 원장 가져오기: 추가 {added}건, 건너뜀 {skipped}건")
+    return JSONResponse({"added": added, "skipped": skipped, "total": len(led.entries)}, headers=_SECURITY_HEADERS)
 
 
 @app.post("/api/notify-test")
