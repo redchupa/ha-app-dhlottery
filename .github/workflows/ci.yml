@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -24,7 +27,9 @@ jobs:
           pip install -r dhlotto45/app/requirements.txt
 
       - name: Syntax check
-        run: python -m compileall -q dhlotto45/app dhlotto45/tests
+        run: |
+          python -m compileall -q dhlotto45/app dhlotto45/tests
+          bash -n dhlotto45/run.sh
 
       - name: Run unit tests
         run: |
@@ -32,3 +37,38 @@ jobs:
           python dhlotto45/tests/test_pension.py
           python dhlotto45/tests/test_dashboard.py
           python dhlotto45/tests/test_features.py
+
+  # 공개 저장소: API 키·토큰·비밀번호·사설 IP 가 커밋에 들어가지 않았는지 검사 (.gitleaks.toml)
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks (current files)
+        run: >-
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.18.4
+          detect --no-git --source=/repo --config=/repo/.gitleaks.toml
+          --redact --verbose --no-banner
+
+      # 이번에 올라온 커밋만 검사(정리 전 옛 기록은 범위에서 제외)
+      - name: gitleaks (new commits)
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE" ]; then
+            RANGE="$BASE..HEAD"
+          elif [ -n "$BEFORE" ] && git cat-file -e "$BEFORE" 2>/dev/null; then
+            RANGE="$BEFORE..HEAD"
+          else
+            RANGE="HEAD~1..HEAD"
+          fi
+          echo "scan range: $RANGE"
+          docker run --rm -v "$PWD:/repo" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+            zricethezav/gitleaks:v8.18.4 \
+            detect --source=/repo --log-opts="$RANGE" --config=/repo/.gitleaks.toml \
+            --redact --verbose --no-banner
