@@ -162,9 +162,11 @@ M_ = I.claim_method
 check(M_("lotto", 1, 2_000_000_000) == "bank_hq" and M_("lotto", 2, 55_000_000) == "bank_branch", "로또 1등 본점 · 2등 지점")
 check(M_("lotto", 3, 2_100_000) == "bank_branch" and M_("lotto", 3, 1_266_451) == "auto" and M_("lotto", 3, 0) == "bank_branch", "로또 3등: 200만원 기준(금액 모르면 지점)")
 check(M_("lotto", 4, 50000) == "auto" and M_("lotto", 5, 5000) == "auto", "로또 4·5등 예치금 자동")
-check(M_("pension", 1, 0) == "online_claim" and M_("pension", 2, 0) == "online_claim" and M_("pension", 0, 0, "보너스") == "online_claim", "연금 1·2등·보너스: 사이트 지급 신청")
+check(M_("pension", 1, 0) == "pension_office" and M_("pension", 2, 0) == "pension_office" and M_("pension", 0, 0, "보너스") == "pension_office", "연금 1·2등·보너스: 지급처((주)동행복권) 방문 청구")
 check(M_("pension", 3, 1_000_000) == "auto" and M_("pension", 7, 1000) == "auto", "연금 3~7등 예치금 자동")
-check(by[("pension", 340)]["how"] == "online_claim" and by[("lotto", 1251)]["how"] == "bank_hq", "목록에 수령 방법 포함")
+check(by[("pension", 340)]["how"] == "pension_office" and by[("lotto", 1251)]["how"] == "bank_hq", "목록에 수령 방법 포함")
+_t, _b = I.claim_message("Account_2", dict(by[("pension", 340)], days_left=7), 7)
+check("동행복권 본사" in _b and "신분증" in _b and "매월 20일" in _b, "연금 연금식 당첨 알림: 본사 방문·신분증·매월 20일")
 check([c["action"] for c in cl][:3] == ["visit", "visit", "visit"], "직접 수령을 먼저")
 check(I._add_year(date(2024, 2, 29)) == date(2025, 2, 28), "윤년 2월 29일")
 

@@ -487,9 +487,25 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       claimTitle: "당첨금 수령 도우미", claimNone: "직접 수령해야 할 당첨이 없습니다 (200만원 이하 인터넷 당첨금은 예치금으로 자동 지급).",
       claimVisit: "지급기한은 추첨일로부터 1년이며, 그날이 은행 휴무일(주말·공휴일)이면 다음 영업일까지입니다. 화면의 날짜는 주말만 반영했으니 공휴일과 겹치면 하루 이상 늘어납니다. 기한이 지나면 당첨금은 복권기금으로 귀속됩니다. (출처: 동행복권 이용안내·당첨자 가이드)",
       how_auto: "예치금 자동 지급", how_bank_branch: "🏦 농협은행 지점 방문 · 신분증·당첨 복권 번호", how_bank_hq: "🏦 농협은행 본점 방문 · 신분증·당첨 복권 번호",
-      how_online_claim: "💻 동행복권 사이트에서 실명 인증·지급 신청 → 다음 달부터 매월 20일 지급",
+      how_pension_office: "🏢 (주)동행복권 본사 방문 · 신분증 → 청구한 다음 달부터 매월 20일 지급",
       claimAuto: "예치금 자동 지급", claimExpired: "기한 지남", icsBtn: "📅 캘린더 받기 (.ics)",
-      icsHint: "추첨·판매 마감·정기 자동 구매·수령 기한이 담긴 파일입니다. 휴대폰·구글 캘린더에서 가져오기 하세요.",
+      icsHint: "휴대폰 캘린더에 '로또 마감 2시간 전'·'당첨금 지급기한' 알림을 넣어 주는 파일입니다. 필요한지 모르겠다면 아래 안내를 펼쳐 보세요.",
+      icsFold: "❓ 캘린더 받기는 언제 쓰나요? · 사용 방법",
+      icsWhyT: "이런 분께 좋아요",
+      icsWhy1: "• HA 알림을 안 쓰거나, 집 밖·HA가 꺼져 있을 때도 휴대폰 자체 알림으로 받고 싶은 분 — 일정과 알림이 휴대폰에 저장되어 HA·인터넷이 없어도 울립니다.",
+      icsWhy2: "• 가족 공유 캘린더에 넣어 다른 가족도 마감·추첨·지급기한을 보게 하고 싶은 분.",
+      icsWhy3: "• 고액 당첨이 있을 때 지급기한(1년)을 놓치지 않도록 30일·7일·1일 전 알림을 휴대폰에 확실히 남겨 두고 싶은 분.",
+      icsSkipT: "안 써도 되는 경우",
+      icsSkip: "⏰ 설정의 마감 알림·당첨금 수령 기한 알림·주간 리포트를 HA 앱(또는 카카오톡)으로 받고 있다면 내용이 거의 같으니 받지 않아도 됩니다.",
+      icsWhatT: "파일에 들어가는 일정",
+      icsWhat: "앞으로 8주 로또 판매 마감(토 20:00, 2시간 전 알림)·연금복권 추첨(목 19:05), 켜 둔 정기 자동 구매 일정(매주 반복), 직접 받아야 하는 당첨금의 지급기한(30·7·1일 전 알림).",
+      icsHowT: "사용 방법",
+      icsHow1: "① 위 '캘린더 받기' 버튼을 누르면 dhlotto45.ics 파일이 내려받아집니다. (HA 앱 안에서 저장이 안 되면 휴대폰·PC 웹 브라우저로 HA에 접속해 받으세요.)",
+      icsHow2: "② 아이폰: 파일 앱에서 dhlotto45.ics 를 눌러 '모두 추가' → 넣을 캘린더 선택.",
+      icsHow3: "③ 안드로이드(구글 캘린더): PC에서 calendar.google.com → 설정 ⚙️ → 가져오기 및 내보내기 → 파일 선택 → 캘린더 선택 → 가져오기. 휴대폰 구글 캘린더에 자동으로 나타납니다.",
+      icsHow4: "④ 삼성 캘린더: 내 파일에서 dhlotto45.ics 를 눌러 삼성 캘린더로 열고 저장.",
+      icsNoteT: "알아 두세요",
+      icsNote: "받은 순간의 내용만 담기고 저절로 갱신되지 않습니다. 8주가 지나거나, 정기 구매 일정을 바꾸거나, 새로 고액 당첨되면 다시 받으세요. 다시 가져올 때는 'DH Lotto' 같은 별도 캘린더를 만들어 두고 그 캘린더를 비운 뒤 가져오면 일정이 겹치지 않습니다.",
       nWeekly: "📬 주간 리포트 (일요일 09시)", nDeadline: "⏰ 마감 알림 (토요일 18시, 이번 주 미구매 계정)", nClaim: "💰 당첨금 수령 기한 알림 (D-30·7·1)",
       nBudget: "💳 계정별 월 예산 (원, 0 = 끄기)", nBudgetHint: "예산을 넘는 구매는 대시보드·HA 버튼·정기 자동 구매 모두에서 막힙니다.",
       hhLabel: "🧾 가계부 자동 기록 (kr_ledger_kit)", hhHint: "kr_ledger_kit 통합이 있으면 구매는 지출, 당첨은 수입으로 회차별로 기록합니다 (카테고리: 복권).",
@@ -561,9 +577,25 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       claimTitle: "Prize claim helper", claimNone: "No prizes to claim in person (online prizes up to 2,000,000 won are credited to your deposit).",
       claimVisit: "The claim deadline is one year from the draw date; if that day is not a bank business day it moves to the next one. Dates here skip weekends only, so a public holiday can push them later. Unclaimed prizes go to the Lottery Fund. (Source: DH Lottery user guide and winner guide)",
       how_auto: "Credited to deposit", how_bank_branch: "🏦 Any NH Bank branch · ID and ticket number", how_bank_hq: "🏦 NH Bank head office only · ID and ticket number",
-      how_online_claim: "💻 Verify your name and apply on the DH Lottery site → paid on the 20th of each month from the next month",
+      how_pension_office: "🏢 Visit the DH Lottery head office with your ID → paid on the 20th of each month from the month after you claim",
       claimAuto: "Credited to deposit", claimExpired: "Expired", icsBtn: "📅 Download calendar (.ics)",
-      icsHint: "Draws, sales cut-off, scheduled purchases and claim deadlines. Import it into your phone or Google Calendar.",
+      icsHint: "A file that puts 'lotto cut-off in 2 hours' and 'prize claim deadline' reminders into your phone calendar. Not sure you need it? Open the guide below.",
+      icsFold: "❓ When is the calendar useful? · How to use it",
+      icsWhyT: "Good for you if",
+      icsWhy1: "• You don't use HA notifications, or want reminders from the phone itself even when you're away or HA is down — the events and alarms live on the phone.",
+      icsWhy2: "• You want family members to see cut-offs, draws and claim deadlines in a shared calendar.",
+      icsWhy3: "• You have a big prize and want 30-, 7- and 1-day reminders before the one-year claim deadline saved on your phone.",
+      icsSkipT: "You can skip it if",
+      icsSkip: "You already receive the cut-off reminder, claim deadline alerts and weekly report from ⏰ settings in the HA app (or Kakao Talk) — the content is almost the same.",
+      icsWhatT: "What the file contains",
+      icsWhat: "Next 8 weeks of lotto sales cut-offs (Sat 20:00, alarm 2 h before) and pension draws (Thu 19:05), your enabled schedules (repeating weekly), and claim deadlines for prizes you must claim yourself (alarms 30, 7 and 1 day before).",
+      icsHowT: "How to use",
+      icsHow1: "① Tap 'Download calendar' above to save dhlotto45.ics. (If saving doesn't work inside the HA app, open HA in your phone or PC web browser and download it there.)",
+      icsHow2: "② iPhone: open dhlotto45.ics in the Files app → 'Add All' → pick a calendar.",
+      icsHow3: "③ Android (Google Calendar): on a PC go to calendar.google.com → Settings ⚙️ → Import & export → choose the file → pick a calendar → Import. It then shows on your phone.",
+      icsHow4: "④ Samsung Calendar: tap dhlotto45.ics in My Files, open it with Samsung Calendar and save.",
+      icsNoteT: "Good to know",
+      icsNote: "The file is a snapshot and does not update by itself. Download it again after 8 weeks, after changing schedules, or after a new big win. To avoid duplicates, import into a separate calendar such as 'DH Lotto' and clear it before re-importing.",
       nWeekly: "📬 Weekly report (Sunday 09:00)", nDeadline: "⏰ Cut-off reminder (Saturday 18:00, accounts without tickets)", nClaim: "💰 Prize claim deadline alerts (D-30·7·1)",
       nBudget: "💳 Monthly budget per account (won, 0 = off)", nBudgetHint: "Purchases over the budget are blocked from the dashboard, HA buttons and schedules.",
       hhLabel: "🧾 Household ledger (kr_ledger_kit)", hhHint: "With the kr_ledger_kit integration, purchases are recorded as expenses and wins as income, per round (category: 복권).",
@@ -1311,6 +1343,13 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     if (visit.length) body.push(h("div", { cls: "hint mt8", text: t("claimVisit") }));
     body.push(h("div", { cls: "btns tight mt10" }, [h("button", { cls: "btn secondary small", type: "button", text: t("icsBtn"), onclick: function () { download("api/calendar.ics"); } })]));
     body.push(h("div", { cls: "hint", text: t("icsHint") }));
+    var icsStart = body.length;
+    [["icsWhyT", ["icsWhy1", "icsWhy2", "icsWhy3"]], ["icsSkipT", ["icsSkip"]], ["icsWhatT", ["icsWhat"]],
+      ["icsHowT", ["icsHow1", "icsHow2", "icsHow3", "icsHow4"]], ["icsNoteT", ["icsNote"]]].forEach(function (sec) {
+      body.push(h("div", { cls: "sect", text: t(sec[0]) }));
+      sec[1].forEach(function (k) { body.push(h("div", { cls: "hint", text: t(k) })); });
+    });
+    foldTail(body, icsStart, "ics-guide", t("icsFold"));
     body.push(h("div", { cls: "hint mt8", text: t("luckNote") }));
     return card("insight", "🧠", t("insight"), lk.top_pct ? t("luckTop") + " " + lk.top_pct + "%" : "", body);
   }

@@ -244,10 +244,19 @@ async def run():
                               " const g = c.querySelector('.gauge > i'); return { luck: !!c.querySelector('.luck b'),"
                               " gauges: c.querySelectorAll('.gauge').length, visit: c.querySelectorAll('.claim.visit').length,"
                               " fill: g ? g.style.width : '', ics: Array.from(c.querySelectorAll('button')).some(b => b.textContent.indexOf('.ics') >= 0),"
+                              " guide: !!c.querySelector('[aria-controls=fold-ics-guide]'),"
                               " wide: c.scrollWidth > c.clientWidth + 1 }; })())")
             check(lab and lab["luck"] and lab["gauges"] == 2 and lab["visit"] == 1 and lab["fill"].endswith("%") and lab["ics"],
                   f"{name}: 럭키 랩 카드(운 지수·예산 게이지·수령 기한·캘린더) {lab}")
             check(lab and not lab["wide"], f"{name}: 럭키 랩 카드가 화면 폭 안에 들어감")
+            check(lab and lab["guide"], f"{name}: 캘린더 받기 사용 안내(접기) 있음")
+            if mobile:
+                await tab.evaluate("document.querySelector('[aria-controls=fold-ics-guide]').click()")
+                opened = await _wait(tab, "(() => { const b = document.getElementById('fold-ics-guide');"
+                                          " return b && !b.hidden && b.querySelectorAll('.hint').length >= 10; })()")
+                g = await _eval(tab, METRICS_JS)
+                check(opened and not g["overflow"] and not g["small"], f"{name}: 캘린더 안내 펼침·가로 넘침 없음 {g['small']}")
+                await tab.evaluate("document.querySelector('[aria-controls=fold-ics-guide]').click()")
             defaults = {"receipt", "winning", "numstats", "stats", "auto"}
             states = {c["id"]: c for c in m["collapsed"]}
             check(all(states[i]["expanded"] == "false" and states[i]["hidden"] for i in defaults if i in states),

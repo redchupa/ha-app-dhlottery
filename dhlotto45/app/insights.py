@@ -225,8 +225,9 @@ def claim_method(game: str, rank: int, amount: int, info: str = "") -> str:
 
     로또 6/45: 200만원 이하(3~5등) → 추첨 다음 날 예치금 자동 지급(auto)
               200만원 초과(2~3등) → NH농협은행 전국 지점(bank_branch), 1등 → NH농협은행 본점만(bank_hq)
-    연금복권720+: 1등·2등·보너스(연금식) → 동행복권 사이트에서 실명 인증·지급 신청(online_claim),
-              3~7등(200만원 이하) → 예치금 자동 지급(auto)
+    연금복권720+: 1등·2등·보너스(연금식) → 신분증을 가지고 지급처((주)동행복권)를 방문해 청구(pension_office).
+              연금복권720+ 안내: "연금식 및 200만 원 초과 당첨자(1매 기준)는 … 실명확인증표(주민등록증 등)를
+              가지고, 해당 당첨금 지급처를 방문하여 청구해야 합니다." 3~7등(200만원 이하) → 예치금 자동 지급(auto)
     """
     if game == "lotto":
         if rank == 1:
@@ -234,10 +235,8 @@ def claim_method(game: str, rank: int, amount: int, info: str = "") -> str:
         if rank == 2 or amount > AUTO_CREDIT_LIMIT or (rank == 3 and amount == 0):
             return "bank_branch"
         return "auto"
-    if rank in (1, 2) or "보너스" in info:
-        return "online_claim"
-    if amount > AUTO_CREDIT_LIMIT:
-        return "online_claim"
+    if rank in (1, 2) or "보너스" in info or amount > AUTO_CREDIT_LIMIT:
+        return "pension_office"
     return "auto"
 
 
@@ -245,7 +244,7 @@ CLAIM_GUIDE = {
     "auto": "예치금으로 자동 지급(추첨 다음 날 06시경)",
     "bank_branch": "신분증과 당첨 복권 번호를 챙겨 NH농협은행 지점에서 수령",
     "bank_hq": "신분증과 당첨 복권 번호를 챙겨 NH농협은행 본점에서만 수령",
-    "online_claim": "동행복권 사이트 마이페이지 > 구매/당첨 내역에서 실명 인증·지급 신청 → 신청 다음 달부터 매월 20일 계좌로 지급",
+    "pension_office": "신분증을 챙겨 당첨금 지급처인 (주)동행복권 본사를 방문해 청구 → 청구한 다음 달부터 매월 20일 계좌로 지급",
 }
 
 
