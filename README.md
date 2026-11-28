@@ -109,8 +109,8 @@ mqtt_password: ""
 1. **Mosquitto broker 설치**: 설정 → 애드온(앱) → 애드온 스토어 → `Mosquitto broker` 설치 → 시작.
 2. **MQTT 통합 추가**: 설정 → 기기 및 서비스에 `MQTT` 가 발견되면 **구성** → 확인. (안 보이면 통합 추가 → MQTT)
 3. **이 애드온 MQTT 칸**
-   - **권장(자동)**: `mqtt_username`·`mqtt_password` 를 **비워 두세요**. Mosquitto broker 가 이 애드온 전용 접속 정보를 자동으로 넘겨줍니다. 로그에 `MQTT: mqtt://core-mosquitto:1883 (auto (Mosquitto broker), user: set)` 이 보이면 정상.
-   - **직접 입력**: 먼저 계정을 만든 뒤 입력합니다. 둘 중 하나:
+   - **Mosquitto broker 애드온을 쓰면(대부분)**: `mqtt_username`·`mqtt_password` 를 **비워 두세요. 사용자 계정을 따로 만들 필요가 없습니다.** 애드온이 `services: mqtt` 로 등록돼 있어서, Supervisor 가 Mosquitto 에서 **이 애드온 전용 MQTT 계정을 자동으로 발급**해 연결합니다(Zigbee2MQTT 등 다른 애드온과 같은 방식). 로그에 `MQTT: mqtt://core-mosquitto:1883 (auto (Mosquitto broker), user: set)` 과 `MQTT connected` 가 보이면 정상입니다.
+   - **직접 입력이 필요한 경우**(다른 기기의 브로커, 또는 특정 계정을 쓰고 싶을 때): 먼저 계정을 만든 뒤 입력합니다. 둘 중 하나:
      - 설정 → 사람 → **사용자 추가** → 이름 예: `mqtt_dhlotto`, 비밀번호 지정 (로그인 허용은 꺼도 됨)
      - Mosquitto broker 애드온 → 구성 → `logins` 에 추가:
        ```yaml
@@ -121,6 +121,8 @@ mqtt_password: ""
      그 다음 이 애드온에 `mqtt_username: mqtt_dhlotto`, `mqtt_password: your_mqtt_password` 입력.
    - **다른 기기의 브로커**: `mqtt_url: "mqtt://브로커주소:1883"` (예: `mqtt://mqtt.example.local:1883`) + 그 브로커의 아이디·비밀번호.
 4. 애드온 재시작 → 로그에서 `MQTT connected` 확인.
+
+> **연결이 안 되면?** 애드온 로그에 이유가 나옵니다 — `MQTT 인증 거부`·`아이디 또는 비밀번호가 틀림` 이면 MQTT 칸을 비우거나 계정을 확인하고, `브로커를 사용할 수 없음` 이면 Mosquitto broker 가 실행 중인지 확인하세요. 대시보드 상단에도 안내가 뜹니다. HA 재부팅 때 브로커가 늦게 켜져도 애드온이 계속 재시도해 **연결되는 순간 센서·버튼을 자동으로 다시 만듭니다**(v2.11.1).
 
 4. **Start** 클릭 → **Log** 탭에서 `Login successful` 확인
 

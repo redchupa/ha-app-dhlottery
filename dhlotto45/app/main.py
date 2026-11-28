@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.11.0
+Lotto 45 Add-on Main Application v2.11.1
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -113,7 +113,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.11.0"
+APP_VERSION = "2.11.1"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -150,7 +150,7 @@ def install_log_alias_filter(usernames) -> None:
 def load_accounts_from_env():
     """Load accounts from environment variables (최대 4계정 제한 적용)."""
     import json
-    
+
     accounts_json = os.getenv("ACCOUNTS", "[]")
     try:
         accounts_list = json.loads(accounts_json)
@@ -163,7 +163,7 @@ def load_accounts_from_env():
             )
         config["accounts"] = limited_accounts
         logger.info(f"Loaded {len(limited_accounts)}/{MAX_ACCOUNTS} account(s) from configuration")
-        
+
         for i, acc in enumerate(limited_accounts, 1):
             username = acc.get("username", "")
             enabled = acc.get("enabled", True)
@@ -242,18 +242,18 @@ def get_next_available_time() -> datetime:
     now = datetime.now(_TZ_KST)
     wd = now.weekday()  # 0=Mon .. 6=Sun
     minutes = now.hour * 60 + now.minute
-    
+
     # 00:00~05:59 (모든 요일): 오늘 06:00
     if minutes < 360:
         next_time = now.replace(hour=6, minute=0, second=0, microsecond=0)
         return next_time
-    
+
     # 토요일 20:00~23:59: 내일(일요일) 06:00
     if wd == 5 and minutes >= 1200:
         next_day = now + timedelta(days=1)
         next_time = next_day.replace(hour=6, minute=0, second=0, microsecond=0)
         return next_time
-    
+
     # 현재 구매 가능한 경우 (이 함수가 호출되면 안 되지만 안전장치)
     return now
 
@@ -263,14 +263,14 @@ async def register_buttons_for_account(account: AccountData):
     if not mqtt_client or not mqtt_client.connected:
         logger.warning(f"[BUTTON][{account.username}] MQTT not connected")
         return
-    
+
     username = account.username
     logger.info(f"[BUTTON][{username}] Registering button entities")
-    
+
     device_suffix = " (Beta)" if config.get("is_beta", False) else ""
     device_name = f"DH Lottery Addon{device_suffix} ({username})"
     device_id = f"dhlotto_addon_{username}"
-    
+
     # Buttons
     buttons = [
         ("buy_auto_1", "로또 1게임 자동 구매", "mdi:ticket-confirmation"),
@@ -296,11 +296,11 @@ async def register_buttons_for_account(account: AccountData):
             device_identifier=device_id,
             icon=icon,
         )
-    
+
     # Input Text
     input_state_topic = f"homeassistant/text/{mqtt_client.topic_prefix}_{username}_manual_numbers/state"
     input_command_topic = f"homeassistant/text/{mqtt_client.topic_prefix}_{username}_manual_numbers/set"
-    
+
     mqtt_client.publish_input_text_discovery(
         input_id="manual_numbers",
         name="로또 수동 구매 번호 (쉼표 구분, 자동은 auto)",
@@ -312,8 +312,8 @@ async def register_buttons_for_account(account: AccountData):
         icon="mdi:numeric",
         mode="text",
     )
-    
-    mqtt_client.client.publish(input_state_topic, "auto,auto,auto,auto,auto,auto", qos=1, retain=True)
+
+    mqtt_client.client.publish(input_state_topic, account.manual_numbers_state or "auto,auto,auto,auto,auto,auto", qos=1, retain=True)
 
     # 연금복권 수동 구매 입력(조,번호). 로또 수동입력과 별도 엔티티로 혼동 방지.
     if config.get("enable_pension720", True):
@@ -330,7 +330,7 @@ async def register_buttons_for_account(account: AccountData):
             icon="mdi:numeric",
             mode="text",
         )
-        mqtt_client.client.publish(pm_state_topic, "", qos=1, retain=True)
+        mqtt_client.client.publish(pm_state_topic, account.pension_manual_state or "", qos=1, retain=True)
 
     logger.info(f"[BUTTON][{username}] All buttons registered")
 
@@ -340,31 +340,31 @@ def on_button_command(client_mqtt, userdata, message):
     try:
         topic = message.topic
         payload = message.payload.decode()
-        
+
         logger.info(f"[MQTT] Received: topic={topic}, payload={payload}")
-        
+
         parts = topic.split("/")
         if len(parts) < 3:
             return
-        
+
         entity_id_full = parts[2]
-        
+
         if not entity_id_full.startswith(mqtt_client.topic_prefix + "_"):
             return
-        
+
         without_prefix = entity_id_full[len(mqtt_client.topic_prefix) + 1:]
-        
+
         username = None
         for acc_username in accounts.keys():
             if without_prefix.startswith(acc_username + "_"):
                 username = acc_username
                 break
-        
+
         if not username or username not in accounts:
             return
-        
+
         account = accounts[username]
-        
+
         # Input text (로또 수동번호 / 연금 수동번호 구분)
         if "/text/" in topic and "/set" in topic:
             text_id = without_prefix[len(username) + 1:]  # manual_numbers | pension_manual
@@ -378,7 +378,7 @@ def on_button_command(client_mqtt, userdata, message):
                 state_topic = f"homeassistant/text/{mqtt_client.topic_prefix}_{username}_manual_numbers/state"
             client_mqtt.publish(state_topic, payload, qos=1, retain=True)
             return
-        
+
         # Button
         button_suffix = without_prefix[len(username) + 1:]
         logger.info(f"[BUTTON][{username}] Button pressed: {button_suffix}")
@@ -389,18 +389,18 @@ def on_button_command(client_mqtt, userdata, message):
             random_numbers = DhLottoAnalyzer.generate_random_numbers(6)
             random_str = ",".join(map(str, random_numbers))
             logger.info(f"[RANDOM][{username}] Generated: {random_str}")
-            
+
             # Update manual_numbers_state
             account.manual_numbers_state = random_str
-            
+
             # Publish to input_text state topic
             state_topic = f"homeassistant/text/{mqtt_client.topic_prefix}_{username}_manual_numbers/state"
             client_mqtt.publish(state_topic, random_str, qos=1, retain=True)
-            
+
             logger.info(f"[RANDOM][{username}] Random numbers published to input text")
             return
 
-        
+
         # 연금복권 수동 UI 진단 (구매 안 함, 안전)
         if button_suffix == "diag_pension_manual":
             if event_loop and event_loop.is_running():
@@ -851,7 +851,7 @@ async def execute_button_purchase(account: AccountData, button_id: str):
         logger.info(f"[PURCHASE][{username}] Executing: {len(slots)} game(s)")
         purchase_attempted = True
         result = await account.lotto_645.async_buy(slots, max_games=max_games)
-        
+
         logger.info(f"[PURCHASE][{username}] Success! Round: {result.round_no}")
         _last_purchase_time[(username, button_id)] = time.monotonic()
         # 구매 후 구매정보 조회까지 완료한 뒤 20초 쿨다운이 시작되도록 락 유지 상태에서 갱신
@@ -882,16 +882,16 @@ async def publish_purchase_error(account: AccountData, error_message: str):
 async def init_account(account: AccountData) -> bool:
     """Initialize account"""
     username = account.username
-    
+
     if not account.enabled:
         logger.info(f"[INIT][{username}] Account disabled")
         return False
-    
+
     try:
         logger.info(f"[INIT][{username}] Initializing...")
         account.client = DhLotteryClient(account.username, account.password)
         await account.client.async_login()
-        
+
         if config["enable_lotto645"]:
             account.lotto_645 = DhLotto645(account.client)
             account.analyzer = DhLottoAnalyzer(account.client)
@@ -913,16 +913,16 @@ async def init_account(account: AccountData) -> bool:
 async def init_clients():
     """Initialize all clients"""
     global mqtt_client
-    
+
     load_accounts_from_env()
     # accounts 는 아래 루프에서 채워지므로 설정 목록으로 미리 별칭 필터를 건다
     # (대시보드와 같은 순서·같은 건너뛰기 규칙 → Account_N 번호 일치).
     install_log_alias_filter(configured_usernames(config["accounts"], MAX_ACCOUNTS))
-    
+
     if not config["accounts"]:
         logger.error("No accounts configured")
         return False
-    
+
     success_count = 0
     for acc_config in config["accounts"]:
         if len(accounts) >= MAX_ACCOUNTS:
@@ -931,25 +931,25 @@ async def init_clients():
         username = acc_config.get("username", "")
         password = acc_config.get("password", "")
         enabled = acc_config.get("enabled", True)
-        
+
         if not username or not password:
             continue
         if username in accounts:
             logger.warning(f"[INIT][{username}] Duplicate username skipped")
             continue
-        
+
         account = AccountData(username, password, enabled)
         accounts[username] = account
-        
+
         if await init_account(account):
             success_count += 1
-    
+
     logger.info(f"Initialized {success_count}/{len(accounts)} account(s)")
-    
+
     # MQTT
     if config["use_mqtt"]:
         logger.info("Initializing MQTT...")
-        
+
         client_id_suffix = "_beta" if config["is_beta"] else ""
         mqtt_client = MQTTDiscovery(
             mqtt_url=os.getenv("MQTT_URL") or "mqtt://core-mosquitto:1883",
@@ -957,65 +957,70 @@ async def init_clients():
             password=os.getenv("MQTT_PASSWORD"),
             client_id_suffix=client_id_suffix,
         )
-        
-        if mqtt_client.connect():
+
+        # 연결·재연결될 때마다 버튼 등록·명령 구독·센서 재발행(_mqtt_on_ready). 처음에 브로커가 아직
+        # 안 떠 있어도(HA 재부팅) 백그라운드 재시도로 연결되면 그때 자동으로 설정된다.
+        mqtt_client.on_ready = _mqtt_ready_from_thread
+        if mqtt_client.connect(wait=10):
             logger.info("MQTT connected")
-            
-            # Only register buttons for successfully logged in accounts
-            for account in accounts.values():
-                if account.enabled and config["enable_lotto645"] and account.client and account.client.logged_in:
-                    await register_buttons_for_account(account)
-                elif account.enabled and (not account.client or not account.client.logged_in):
-                    logger.warning(f"[BUTTON][{account.username}] Skipping button registration - not logged in")
-            
-            # Subscribe to button commands for ALL logged-in accounts
-            if accounts:
-                # Set callback once
-                mqtt_client.client.on_message = on_button_command
-                
-                # Subscribe to each account's buttons
-                for account in accounts.values():
-                    if account.enabled and account.client and account.client.logged_in:
-                        button_ids = ["buy_auto_1", "buy_auto_5", "buy_manual", "generate_random"]
-                        if config.get("enable_pension720", True):
-                            button_ids += [
-                                "buy_pension_auto_1", "buy_pension_auto_5",
-                                "buy_pension_manual", "diag_pension_manual",
-                            ]
-
-                        # Subscribe to button commands
-                        for button_id in button_ids:
-                            command_topic = f"homeassistant/button/{mqtt_client.topic_prefix}_{account.username}_{button_id}/command"
-                            mqtt_client.client.subscribe(command_topic)
-                            logger.info(f"[MQTT] Subscribed: {command_topic}")
-
-                        # Subscribe to input_text (로또 수동번호 + 연금 수동번호)
-                        text_ids = ["manual_numbers"]
-                        if config.get("enable_pension720", True):
-                            text_ids.append("pension_manual")
-                        for text_id in text_ids:
-                            input_command_topic = f"homeassistant/text/{mqtt_client.topic_prefix}_{account.username}_{text_id}/set"
-                            mqtt_client.client.subscribe(input_command_topic)
-                            logger.info(f"[MQTT] Subscribed: {input_command_topic}")
-                
-                logger.info(f"[MQTT] Subscribed to {len([a for a in accounts.values() if a.enabled and a.client and a.client.logged_in])} account(s)")
         else:
-            logger.warning("MQTT connection failed")
-            mqtt_client = None
-    
+            logger.warning(
+                "MQTT 브로커에 아직 연결되지 않았습니다. 연결되면 센서·버튼이 자동으로 만들어집니다. "
+                "Mosquitto broker 애드온이 실행 중인지, MQTT 통합이 추가돼 있는지 확인하세요."
+            )
+
     return success_count > 0
+
+
+def _mqtt_ready_from_thread() -> None:
+    """paho 스레드에서 불림 → 이벤트 루프에서 설정 작업 실행."""
+    if event_loop and event_loop.is_running():
+        asyncio.run_coroutine_threadsafe(_mqtt_on_ready(), event_loop)
+
+
+_mqtt_ready_lock = asyncio.Lock()
+
+
+async def _mqtt_on_ready() -> None:
+    """MQTT 연결(재연결) 직후: 버튼·입력 엔티티 등록, 명령 구독, 마지막 센서 값 재발행."""
+    if not mqtt_client or not mqtt_client.connected:
+        return
+    async with _mqtt_ready_lock:
+        mqtt_client.client.on_message = on_button_command
+        for account in accounts.values():
+            if not account.enabled:
+                continue
+            if config["enable_lotto645"] and account.client and account.client.logged_in:
+                await register_buttons_for_account(account)
+            button_ids = ["buy_auto_1", "buy_auto_5", "buy_manual", "generate_random"]
+            text_ids = ["manual_numbers"]
+            if config.get("enable_pension720", True):
+                button_ids += ["buy_pension_auto_1", "buy_pension_auto_5", "buy_pension_manual", "diag_pension_manual"]
+                text_ids.append("pension_manual")
+            for button_id in button_ids:
+                mqtt_client.subscribe(f"homeassistant/button/{mqtt_client.topic_prefix}_{account.username}_{button_id}/command")
+            for text_id in text_ids:
+                mqtt_client.subscribe(f"homeassistant/text/{mqtt_client.topic_prefix}_{account.username}_{text_id}/set")
+            # 끊겨 있던 동안의 값을 HA 에 바로 반영
+            for entity_id, item in list(account.sensor_cache.items()):
+                try:
+                    await publish_sensor_mqtt(mqtt_client=mqtt_client, entity_id=entity_id, state=item.get("state"),
+                                              username=account.username, attributes=item.get("attributes") or {})
+                except Exception as e:  # noqa: BLE001
+                    logger.debug(f"[MQTT] 재발행 실패 {entity_id}: {e}")
+        logger.info(f"[MQTT] 연결 후 설정 완료(구독 {len(mqtt_client.subscriptions)}개, 계정 {len(accounts)}개)")
 
 
 async def cleanup_clients():
     """Cleanup"""
     global mqtt_client
-    
+
     if mqtt_client:
         try:
             mqtt_client.disconnect()
         except:
             pass
-    
+
     for account in accounts.values():
         if account.client:
             try:
@@ -1028,24 +1033,24 @@ async def cleanup_clients():
 async def lifespan(app: FastAPI):
     """Lifecycle"""
     global event_loop
-    
+
     logger.info(f"Starting v{APP_VERSION} Multi-Account...")
-    
+
     event_loop = asyncio.get_running_loop()
     await init_clients()
-    
+
     tasks = []
     for account in accounts.values():
         if account.enabled:
             task = asyncio.create_task(background_tasks_for_account(account))
             account.update_task = task
             tasks.append(task)
-    
+
     tasks.append(asyncio.create_task(auto_buy_loop()))
     logger.info("Started")
-    
+
     yield
-    
+
     logger.info("Shutting down...")
     for task in tasks:
         task.cancel()
@@ -1582,9 +1587,9 @@ async def update_sensors_for_account(account: AccountData):
         time_until_available = next_available - now_kst
         hours = int(time_until_available.total_seconds() // 3600)
         minutes = int((time_until_available.total_seconds() % 3600) // 60)
-        
+
         logger.info(f"[SENSOR][{username}] Purchase unavailable time (KST). Next sync at {next_available.strftime('%H:%M')}")
-        
+
         # 사용자에게 상태 알림 센서 발행
         await publish_sensor_for_account(account, "lotto45_sync_status", "구매 불가 시간 (동기화 대기 중)", {
             "status": "waiting",
@@ -1599,7 +1604,7 @@ async def update_sensors_for_account(account: AccountData):
             "friendly_name": "동기화 상태",
             "icon": "mdi:sleep",
         })
-        
+
         return
 
     # 로그인 확인 및 재로그인 시도
@@ -1612,7 +1617,7 @@ async def update_sensors_for_account(account: AccountData):
             now_kst = datetime.now(_TZ_KST)
             msg = str(e)[:255]
             logger.error(f"[SENSOR][{username}] Login failed: {e}")
-            
+
             # 로그인 오류 센서
             await publish_sensor_for_account(account, "lotto45_login_error", msg, {
                 "error": str(e),
@@ -1620,7 +1625,7 @@ async def update_sensors_for_account(account: AccountData):
                 "friendly_name": "로그인 오류",
                 "icon": "mdi:account-alert",
             })
-            
+
             # 동기화 상태 센서 (재로그인 실패)
             await publish_sensor_for_account(account, "lotto45_sync_status", "동기화 실패 (재로그인 필요)", {
                 "status": "relogin_failed",
@@ -1631,10 +1636,10 @@ async def update_sensors_for_account(account: AccountData):
                 "friendly_name": "동기화 상태",
                 "icon": "mdi:login-variant",
             })
-            
+
             logger.warning(f"[SENSOR][{username}] Skipping sensor update due to login failure")
             return
-    
+
     try:
         logger.info(f"[SENSOR][{username}] Updating sensors...")
 
@@ -1661,7 +1666,7 @@ async def update_sensors_for_account(account: AccountData):
             "friendly_name": "예치금",
             "icon": "mdi:wallet",
         })
-        
+
         # Purchase time info
         await publish_sensor_for_account(account, "lotto45_purchase_available_time",
             "weekdays: 06:00-24:00, saturday: 06:00-20:00, sunday: 06:00-24:00", {
@@ -1671,7 +1676,7 @@ async def update_sensors_for_account(account: AccountData):
             "friendly_name": "로또 구매 가능 시간",
             "icon": "mdi:clock-time-eight",
         })
-        
+
         # (당첨 결과 센서 lotto645_* 는 publish_lottery_result_sensors() 로 분리되어
         #  함수 앞부분에서 로그인 여부와 무관하게 발행된다.)
         if config["enable_lotto645"] and account.analyzer:
@@ -1680,18 +1685,18 @@ async def update_sensors_for_account(account: AccountData):
                 history = await account.lotto_645.async_get_buy_history_this_week()
                 latest_round_no = await account.lotto_645.async_get_latest_round_no()
                 current_round = latest_round_no + 1  # 아직 추첨 안 된 회차 = 현재 판매 중
-                
+
                 # Collect games (max 5) - 현재 회차(current_round) 구매만 표시
                 all_games = []
                 if history:
                     latest_purchase = history[0]
-                    
+
                     games_info = [{
                         "slot": g.slot,
                         "mode": str(g.mode),
                         "numbers": g.numbers
                     } for g in latest_purchase.games]
-                    
+
                     await publish_sensor_for_account(account, "lotto45_latest_purchase", latest_purchase.round_no, {
                         "round_no": latest_purchase.round_no,
                         "barcode": latest_purchase.barcode,
@@ -1701,7 +1706,7 @@ async def update_sensors_for_account(account: AccountData):
                         "friendly_name": "로또 최근 구매 회차",
                         "icon": "mdi:receipt-text",
                     })
-                    
+
                     # 현재 회차 구매만 필터: round_no == current_round (이전 회차는 prev_game에 표시)
                     for purchase in history:
                         if purchase.round_no != current_round:
@@ -1719,10 +1724,10 @@ async def update_sensors_for_account(account: AccountData):
                 else:
                     # No purchase history
                     logger.info(f"[SENSOR][{username}] No purchase history in the last week")
-                
+
                 logger.info(f"[SENSOR][{username}] Publishing 5 game sensors (current_round={current_round}, filled: {len(all_games)})")
                 weekly_purchase_count = 0
-                
+
                 # 구매 게임 (현재): 최근 5게임 구매내역 및 결과 표시
                 for i in range(1, 6):
                     if i <= len(all_games):
@@ -1864,11 +1869,11 @@ async def update_sensors_for_account(account: AccountData):
                             })
                 except Exception as e:
                     logger.warning(f"[SENSOR][{username}] Prev-round sensors failed: {e}")
-                
+
                 # Weekly purchase count
                 weekly_limit = 5
                 remaining_count = max(0, weekly_limit - weekly_purchase_count)
-                
+
                 await publish_sensor_for_account(account, "lotto45_weekly_purchase_count", weekly_purchase_count, {
                     "weekly_limit": weekly_limit,
                     "remaining": remaining_count,
@@ -1876,18 +1881,18 @@ async def update_sensors_for_account(account: AccountData):
                     "unit_of_measurement": "games",
                     "icon": "mdi:ticket-confirmation" if remaining_count > 0 else "mdi:close-circle",
                 })
-                
+
                 logger.info(f"[SENSOR][{username}] Weekly: {weekly_purchase_count}/{weekly_limit}")
-                    
+
             except Exception as e:
                 logger.warning(f"[SENSOR][{username}] Failed purchase history: {e}")
-        
-        
+
+
         # Purchase Statistics (Total Winning)
         if config["enable_lotto645"] and account.analyzer:
             try:
                 stats = await account.analyzer.async_get_purchase_statistics(days=365)
-                
+
                 await publish_sensor_for_account(account, "lotto45_total_winning", stats.total_winning_amount, {
                     "total_purchase": stats.total_purchase_amount,
                     "total_purchase_count": stats.total_purchase_count,
@@ -1899,12 +1904,12 @@ async def update_sensors_for_account(account: AccountData):
                     "friendly_name": "로또 총 당첨금 (최근 1년)",
                     "icon": "mdi:trophy-variant",
                 })
-                
+
                 logger.info(f"[SENSOR][{username}] Purchase statistics updated (winning: {stats.total_winning_amount} KRW, ROI: {stats.roi}%)")
-                
+
             except Exception as e:
                 logger.warning(f"[SENSOR][{username}] Failed to update purchase statistics: {e}")
-        
+
         # 연금복권 구매 내역 (로그인 필요)
         if config.get("enable_pension720", True):
             await publish_pension_history_sensors(account)
@@ -1915,7 +1920,7 @@ async def update_sensors_for_account(account: AccountData):
                 # Calculate probabilities (fixed values based on combinatorics)
                 # Total combinations: C(45, 6) = 8,145,060
                 total_combinations = 8145060
-                
+
                 # 1st prize: 6 numbers match = 1 / 8,145,060
                 prob_1st = (1 / total_combinations) * 100
                 await publish_sensor_for_account(account, "lotto645_probability_rank1", f"{prob_1st:.7f}", {
@@ -1925,7 +1930,7 @@ async def update_sensors_for_account(account: AccountData):
                     "friendly_name": "로또 1등 당첨 확률",
                     "icon": "mdi:trophy",
                 })
-                
+
                 # 2nd prize: 5 numbers + bonus = 6 / 8,145,060
                 prob_2nd = (6 / total_combinations) * 100
                 await publish_sensor_for_account(account, "lotto645_probability_rank2", f"{prob_2nd:.7f}", {
@@ -1935,7 +1940,7 @@ async def update_sensors_for_account(account: AccountData):
                     "friendly_name": "로또 2등 당첨 확률",
                     "icon": "mdi:medal",
                 })
-                
+
                 # 3rd prize: 5 numbers = 234 / 8,145,060
                 prob_3rd = (234 / total_combinations) * 100
                 await publish_sensor_for_account(account, "lotto645_probability_rank3", f"{prob_3rd:.5f}", {
@@ -1945,7 +1950,7 @@ async def update_sensors_for_account(account: AccountData):
                     "friendly_name": "로또 3등 당첨 확률",
                     "icon": "mdi:medal-outline",
                 })
-                
+
                 # 4th prize: 4 numbers = 11,115 / 8,145,060
                 prob_4th = (11115 / total_combinations) * 100
                 await publish_sensor_for_account(account, "lotto645_probability_rank4", f"{prob_4th:.4f}", {
@@ -1955,7 +1960,7 @@ async def update_sensors_for_account(account: AccountData):
                     "friendly_name": "로또 4등 당첨 확률",
                     "icon": "mdi:currency-krw",
                 })
-                
+
                 # 5th prize: 3 numbers = 185,220 / 8,145,060
                 prob_5th = (185220 / total_combinations) * 100
                 await publish_sensor_for_account(account, "lotto645_probability_rank5", f"{prob_5th:.3f}", {
@@ -1965,12 +1970,12 @@ async def update_sensors_for_account(account: AccountData):
                     "friendly_name": "로또 5등 당첨 확률",
                     "icon": "mdi:cash",
                 })
-                
+
                 logger.info(f"[SENSOR][{username}] Winning probabilities updated")
-                
+
             except Exception as e:
                 logger.warning(f"[SENSOR][{username}] Failed to update winning probabilities: {e}")
-        
+
         # Update time
         now = datetime.now(timezone.utc).isoformat()
         now_kst = datetime.now(_TZ_KST)
@@ -1978,7 +1983,7 @@ async def update_sensors_for_account(account: AccountData):
             "friendly_name": "마지막 업데이트",
             "icon": "mdi:clock-check-outline",
         })
-        
+
         # 동기화 상태 센서 (정상)
         await publish_sensor_for_account(account, "lotto45_sync_status", "정상 동기화 완료", {
             "status": "success",
@@ -1987,15 +1992,15 @@ async def update_sensors_for_account(account: AccountData):
             "friendly_name": "동기화 상태",
             "icon": "mdi:check-circle",
         })
-        
+
         logger.info(f"[SENSOR][{username}] Updated successfully")
-        
+
     except DhLotteryLoginError as e:
         if account.client:
             account.client.logged_in = False
         msg = str(e)[:255]
         now_kst = datetime.now(_TZ_KST)
-        
+
         # 로그인 오류 센서
         await publish_sensor_for_account(account, "lotto45_login_error", msg, {
             "error": str(e),
@@ -2003,7 +2008,7 @@ async def update_sensors_for_account(account: AccountData):
             "friendly_name": "로그인 오류",
             "icon": "mdi:account-alert",
         })
-        
+
         # 동기화 상태 센서 (로그인 실패)
         await publish_sensor_for_account(account, "lotto45_sync_status", "동기화 실패 (로그인 오류)", {
             "status": "login_error",
@@ -2013,15 +2018,15 @@ async def update_sensors_for_account(account: AccountData):
             "friendly_name": "동기화 상태",
             "icon": "mdi:alert-circle",
         })
-        
+
         logger.warning(f"[SENSOR][{username}] Login/API failed: {e}")
-        
+
     except DhLotteryError as e:
         if account.client:
             account.client.logged_in = False
         msg = str(e)[:255]
         now_kst = datetime.now(_TZ_KST)
-        
+
         # API 오류 센서
         await publish_sensor_for_account(account, "lotto45_login_error", msg, {
             "error": str(e),
@@ -2029,7 +2034,7 @@ async def update_sensors_for_account(account: AccountData):
             "friendly_name": "로그인/API 오류",
             "icon": "mdi:account-alert",
         })
-        
+
         # 동기화 상태 센서 (API 실패)
         await publish_sensor_for_account(account, "lotto45_sync_status", "동기화 실패 (API 오류)", {
             "status": "api_error",
@@ -2039,13 +2044,13 @@ async def update_sensors_for_account(account: AccountData):
             "friendly_name": "동기화 상태",
             "icon": "mdi:alert-circle",
         })
-        
+
         logger.warning(f"[SENSOR][{username}] Update failed (API): {e}")
-        
+
     except Exception as e:
         msg = str(e)[:255]
         now_kst = datetime.now(_TZ_KST)
-        
+
         # 동기화 상태 센서 (알 수 없는 오류)
         await publish_sensor_for_account(account, "lotto45_sync_status", "동기화 실패 (알 수 없는 오류)", {
             "status": "unknown_error",
@@ -2055,7 +2060,7 @@ async def update_sensors_for_account(account: AccountData):
             "friendly_name": "동기화 상태",
             "icon": "mdi:alert-circle",
         })
-        
+
         logger.error(f"[SENSOR][{username}] Update failed: {e}", exc_info=True)
 
 
@@ -2084,13 +2089,18 @@ async def publish_sensor_for_account(account: AccountData, entity_id: str, state
                 return
         except Exception as e:
             logger.error(f"[SENSOR][{username}] MQTT error: {e}")
-    
-    # REST API fallback
+
+    # MQTT 를 쓰는데 잠시 끊긴 경우: REST 로 따로 만들지 않는다(실제 아이디가 든 중복 엔티티가 생김).
+    # 값은 sensor_cache 에 남아 있고, 다시 연결되면 _mqtt_on_ready 가 한꺼번에 재발행한다.
+    if mqtt_client is not None:
+        return
+
+    # REST API fallback (MQTT 클라이언트가 아예 없을 때만)
     import aiohttp
-    
+
     if not config["supervisor_token"]:
         return
-    
+
     addon_entity_id = f"addon_{username}_{entity_id}"
     url = f"{config['ha_url']}/api/states/sensor.{addon_entity_id}"
     headers = {
@@ -2101,7 +2111,7 @@ async def publish_sensor_for_account(account: AccountData, entity_id: str, state
         "state": state,
         "attributes": attributes or {},
     }
-    
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=data, headers=headers, ssl=False) as resp:
@@ -2204,6 +2214,8 @@ async def api_dashboard(request: Request):
             "pension_enabled": bool(config.get("enable_pension720", True)),
             "purchase_available": is_purchase_available_now(),
             "cooldown_seconds": int(INTER_ACCOUNT_COOLDOWN_SECONDS),
+            "mqtt_connected": bool(mqtt_client and mqtt_client.connected),
+            "mqtt_error": (mqtt_client.last_error if mqtt_client else "MQTT 클라이언트 없음")[:200],
             "actions": actions,
             "accounts": out,
         },
@@ -2911,7 +2923,9 @@ async def _build_diagnostics() -> str:
         f"DH Lotto 45 v{APP_VERSION} 진단 리포트 · {now.strftime('%Y-%m-%d %H:%M')} KST",
         f"- 기기: {platform.machine()} · Python {platform.python_version()}",
         f"- zendriver {zd_ver} · chromium {await _chromium_version()}",
-        f"- MQTT: {'연결됨' if (mqtt_client and mqtt_client.connected) else '연결 안 됨'}",
+        f"- MQTT: {'연결됨' if (mqtt_client and mqtt_client.connected) else '연결 안 됨'}"
+        f"{(' · ' + mqtt_client.last_error) if (mqtt_client and mqtt_client.last_error) else ''}"
+        f" · 인증 {'아이디 사용' if os.getenv('MQTT_USERNAME') else '없음'}",
         f"- 로또 판매 시간: {'예' if is_purchase_available_now() else '아니오'}",
     ]
     s = _load_settings()

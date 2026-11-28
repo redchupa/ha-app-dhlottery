@@ -8,16 +8,19 @@ configuration:
   mqtt_url:
     name: MQTT broker URL
     description: >-
-      Keep mqtt://core-mosquitto:1883 when you use the Mosquitto broker add-on. For a broker on
-      another machine use mqtt://broker-host:1883 (e.g. mqtt://mqtt.example.local:1883).
-      Leave the MQTT username empty to use the Mosquitto broker connection details automatically.
+      [Mosquitto broker add-on] keep mqtt://core-mosquitto:1883 (with an empty username the address is
+      set automatically). [Broker on another machine] mqtt://broker-host:1883 (e.g. mqtt://mqtt.example.local:1883).
+      MQTT is required — sensors and buttons are created over MQTT, so the Mosquitto broker add-on and the
+      MQTT integration must be set up.
   mqtt_username:
     name: MQTT username
     description: >-
-      Leave empty for automatic setup (needs the Mosquitto broker add-on; recommended). To enter
-      one yourself, first create it: add a dedicated user under Settings → People (e.g.
-      mqtt_dhlotto), or add a username/password to the Mosquitto broker add-on's logins option.
+      [Mosquitto broker add-on: leave empty — no account needed] When empty, the Supervisor gets a dedicated
+      MQTT account for this add-on from Mosquitto automatically (the same way Zigbee2MQTT and others work).
+      [Fill in only] when you use a broker on another machine or want a specific account. Then create the
+      account first: Settings → People → add user (e.g. mqtt_dhlotto), or add it to the Mosquitto broker
+      logins option. If the connection fails, the add-on log shows why (e.g. authentication refused).
   mqtt_password:
     name: MQTT password
     description: >-
-      Password for the MQTT username above. Leave empty when using automatic setup.
+      Password for the MQTT username above. Leave empty when using the automatic connection.

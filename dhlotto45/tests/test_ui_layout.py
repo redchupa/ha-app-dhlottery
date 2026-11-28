@@ -198,10 +198,19 @@ async def _wait(tab, js, timeout=10.0):
 
 
 async def run():
-    try:
-        browser = await zd.start(headless=True, sandbox=False, browser_args=["--disable-gpu", "--disable-dev-shm-usage"])
-    except Exception as e:  # noqa: BLE001
-        skip(f"Chrome 을 띄울 수 없음 ({e})")
+    # 느린 CI 기기에서는 Chrome 기동이 zendriver 기본 대기(약 2.5초)보다 오래 걸린다 → 애드온과 같은 연결 대기 + 1회 재시도
+    from dh_pension_browser import browser_connect_kwargs
+    browser, last_err = None, None
+    for _attempt in range(2):
+        try:
+            browser = await zd.start(headless=True, sandbox=False, browser_args=["--disable-gpu", "--disable-dev-shm-usage"],
+                                     **browser_connect_kwargs(zd))
+            break
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            await asyncio.sleep(3)
+    if browser is None:
+        skip(f"Chrome 을 띄울 수 없음 ({last_err})")
     try:
         sizes = [("phone-small", 360, 740, True), ("phone", 390, 844, True), ("tablet", 768, 1024, False), ("desktop", 1280, 800, False)]
         for name, w, hgt, mobile in sizes:

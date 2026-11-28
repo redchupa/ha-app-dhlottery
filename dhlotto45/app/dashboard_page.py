@@ -479,7 +479,9 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       nsAbsent: "오래 안 나온 번호", nsTimes: "회", nsAgo: "회 전", nsNever: "범위 밖", nsExpected: "평균 기대", nsTotal: "누적",
       nsNote: "보너스 번호 제외 · 과거 통계일 뿐 다음 추첨 확률은 모든 번호가 같습니다.", nsLoading: "통계를 불러오는 중…", nsFail: "번호 통계를 불러오지 못했습니다: ",
       exportCsv: "⬇ CSV 내보내기", exportJson: "⬇ 백업(JSON)", importJson: "⬆ 백업 가져오기", importOk: "가져오기 완료: 추가 ", importSkip: "건, 건너뜀 ", importFail: "가져오기 실패: ",
-      exportFail: "내보내기 실패: ", qTop: "맨 위로", expand: "펼치기", collapse: "접기",
+      exportFail: "내보내기 실패: ", qTop: "맨 위로",
+      mqttDown: "📡 MQTT 브로커에 연결되지 않아 HA 센서·버튼이 갱신되지 않아요",
+      mqttHow: "Mosquitto broker 애드온이 실행 중인지 확인하세요. 애드온 구성의 MQTT 아이디·비밀번호를 비워 두면 Mosquitto 가 이 애드온 전용 계정을 자동으로 줍니다. 연결되면 센서·버튼이 자동으로 다시 만들어지고, 이 화면의 구매는 MQTT 와 상관없이 됩니다.", expand: "펼치기", collapse: "접기",
       foldLotto: "✍️ 번호 직접 고르기 (수동·반자동)", foldPension: "✍️ 조·번호 직접 고르기 (수동)", foldSchedule: "➕ 일정 추가", foldNotify: "🔔 알림 설정",
       q_summary: "요약", q_buy: "구매", q_receipt: "용지", q_favorites: "즐겨찾기", q_lotto_current: "로또", q_lotto_prev: "지난 로또",
       q_pension_current: "연금", q_pension_prev: "지난 연금", q_winning: "당첨번호", q_numstats: "번호통계", q_stats: "지출통계", q_auto: "자동",
@@ -532,7 +534,9 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       nsAbsent: "Long absent", nsTimes: "x", nsAgo: " ago", nsNever: "out of range", nsExpected: "Expected", nsTotal: "All-time",
       nsNote: "Bonus numbers excluded · past statistics only; every number has the same odds next draw.", nsLoading: "Loading statistics…", nsFail: "Could not load number stats: ",
       exportCsv: "⬇ Export CSV", exportJson: "⬇ Backup (JSON)", importJson: "⬆ Import backup", importOk: "Imported: added ", importSkip: ", skipped ", importFail: "Import failed: ",
-      exportFail: "Export failed: ", qTop: "Top", expand: "Expand", collapse: "Collapse",
+      exportFail: "Export failed: ", qTop: "Top",
+      mqttDown: "📡 Not connected to the MQTT broker, so HA sensors and buttons are not updating",
+      mqttHow: "Check that the Mosquitto broker add-on is running. Leave the MQTT username/password empty in the add-on configuration and Mosquitto gives this add-on its own account automatically. Sensors and buttons are recreated once connected; buying from this page works without MQTT.", expand: "Expand", collapse: "Collapse",
       foldLotto: "✍️ Pick numbers (manual / semi-auto)", foldPension: "✍️ Pick group & number (manual)", foldSchedule: "➕ Add schedule", foldNotify: "🔔 Notification settings",
       q_summary: "Summary", q_buy: "Buy", q_receipt: "Slip", q_favorites: "Favorites", q_lotto_current: "Lotto", q_lotto_prev: "Last lotto",
       q_pension_current: "Pension", q_pension_prev: "Last pension", q_winning: "Winning", q_numstats: "Numbers", q_stats: "Spending", q_auto: "Auto",
@@ -1357,6 +1361,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     var acc = currentAcc();
     renderHero(acc);
     renderCelebrate(acc);
+    if (data.mqtt_connected === false) notes.appendChild(h("div", { cls: "notice warn" }, [h("b", { text: t("mqttDown") }),
+      h("div", { cls: "hint closed", text: (data.mqtt_error ? "(" + data.mqtt_error + ") " : "") + t("mqttHow") })]));
     if (!data.purchase_available) notes.appendChild(h("div", { cls: "notice warn has-art" }, [art("empty", "notice-img", ""),
       h("div", null, [h("b", { text: t("lottoClosed") }), h("div", { cls: "hint closed", text: t("closedBody") })])]));
     [["lotto45_login_error", "loginErr"], ["lotto45_purchase_error", "lottoErr"], ["pension720_purchase_error", "penErr"]].forEach(function (p) {
