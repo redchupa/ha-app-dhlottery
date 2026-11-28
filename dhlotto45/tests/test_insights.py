@@ -151,7 +151,20 @@ check(by[("lotto", 1250)]["action"] == "auto" and by[("lotto", 1251)]["action"] 
 check(by[("pension", 340)]["action"] == "visit" and by[("lotto", 1252)]["action"] == "visit", "연금 1·2등, 금액 모르는 3등 이상 → 직접 수령")
 check(("lotto", 1000) not in by, "기한이 한참 지난 당첨은 목록에서 제외")
 c1 = by[("lotto", 1251)]
-check(c1["deadline"] == "2027-11-21" and c1["days_left"] == (date(2027, 11, 21) - today).days, "지급기한 = 추첨일 + 1년(추정)")
+check(c1["deadline"] == "2027-11-22" and c1["days_left"] == (date(2027, 11, 22) - today).days, "지급기한 = 추첨일 + 1년, 일요일이면 월요일")
+# 보도된 실제 지급기한으로 규칙 검증(동행복권 미수령 당첨금 안내·언론 보도)
+check(I.claim_deadline(I.draw_date("lotto", 1196)) == date(2026, 11, 2), "1196회(2025-11-01 추첨) 기한 2026-11-02(월)")
+check(I.claim_deadline(I.draw_date("lotto", 1203)) == date(2026, 12, 21), "1203회(2025-12-20 추첨) 기한 2026-12-21(월)")
+check(I.claim_deadline(I.draw_date("lotto", 1159)) == date(2026, 2, 16), "1159회(2025-02-15 추첨) 2026-02-16(월) — 설 연휴는 화면 안내로")
+check(I.claim_deadline(date(2026, 12, 3)) == date(2027, 12, 3), "평일이면 그대로(연금 목요일 추첨)")
+check(all(I.claim_deadline(I.draw_date("lotto", r)).weekday() < 5 for r in range(1100, 1300)), "기한은 항상 평일")
+M_ = I.claim_method
+check(M_("lotto", 1, 2_000_000_000) == "bank_hq" and M_("lotto", 2, 55_000_000) == "bank_branch", "로또 1등 본점 · 2등 지점")
+check(M_("lotto", 3, 2_100_000) == "bank_branch" and M_("lotto", 3, 1_266_451) == "auto" and M_("lotto", 3, 0) == "bank_branch", "로또 3등: 200만원 기준(금액 모르면 지점)")
+check(M_("lotto", 4, 50000) == "auto" and M_("lotto", 5, 5000) == "auto", "로또 4·5등 예치금 자동")
+check(M_("pension", 1, 0) == "online_claim" and M_("pension", 2, 0) == "online_claim" and M_("pension", 0, 0, "보너스") == "online_claim", "연금 1·2등·보너스: 사이트 지급 신청")
+check(M_("pension", 3, 1_000_000) == "auto" and M_("pension", 7, 1000) == "auto", "연금 3~7등 예치금 자동")
+check(by[("pension", 340)]["how"] == "online_claim" and by[("lotto", 1251)]["how"] == "bank_hq", "목록에 수령 방법 포함")
 check([c["action"] for c in cl][:3] == ["visit", "visit", "visit"], "직접 수령을 먼저")
 check(I._add_year(date(2024, 2, 29)) == date(2025, 2, 28), "윤년 2월 29일")
 
@@ -165,7 +178,8 @@ check(I.claim_reminders_due(near, sent) == [], "보낸 단계는 다시 안 보�
 check(f"p340:30" in sent, "D-5 에 처음 알리면 D-30 단계도 보낸 것으로")
 check(I.claim_reminders_due([dict(c1, days_left=200)], {}) == [] and I.claim_reminders_due([dict(c1, days_left=-1)], {}) == [], "멀거나 지난 기한은 알림 없음")
 title, body = I.claim_message("Account_1", dict(c1, days_left=7), 7)
-check("D-7" in title and "Account_1" in title and "2027-11-21" in body and "sampleid" not in body, "리마인더 문구")
+check("D-7" in title and "Account_1" in title and "2027-11-22" in body and "본점" in body and "공휴일" in body
+      and "추정" not in body and "sampleid" not in body, "리마인더 문구(기한·수령처·휴무일 규칙)")
 
 # ------------------------------------------------ weekly report & deadline reminder
 print("[주간 리포트·마감 알림]")
@@ -212,7 +226,7 @@ unfolded = ics.replace("\r\n ", "")
 check("RRULE:FREQ=WEEKLY;BYDAY=MO,SA" in unfolded and "로또 자동 5게임\\, 이번 주" in unfolded, "반복 일정·쉼표 이스케이프")
 check("DTSTART:20261205T110000Z" in unfolded, "판매 마감 토 20:00 KST = 11:00 UTC")
 check("DTSTART:20261130T005500Z" in unfolded and "DTEND:20261130T010500Z" in unfolded, "정기 구매 09:55 → +10분(시간 넘김)")
-check("TRIGGER:-P30D" in unfolded and "DTSTART;VALUE=DATE:20271121" in unfolded, "수령 기한 종일 일정 + 알림")
+check("TRIGGER:-P30D" in unfolded and "DTSTART;VALUE=DATE:20271122" in unfolded and "추정" not in unfolded, "수령 기한 종일 일정 + 알림")
 again = I.build_ics(today, now, schedules=sched, labels=labels, claim_list=cl)
 uid = lambda x: [ln for ln in x.replace("\r\n ", "").split("\r\n") if ln.startswith("UID:claim")]
 check(uid(ics) == uid(again) and len(uid(ics)) == 3, "UID 가 매번 같다(캘린더 중복 방지)")

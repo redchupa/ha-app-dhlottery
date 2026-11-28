@@ -485,7 +485,9 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       budgetTitle: "이번 달 예산", budgetOff: "월 예산이 꺼져 있습니다 — ⏰ 설정에서 계정별 월 예산을 정하면 넘는 구매를 자동으로 막아 줍니다.",
       budgetUsed: "사용", budgetLeft: "남음", budgetOver: "예산을 다 썼습니다 — 이번 달 추가 구매는 막힙니다.",
       claimTitle: "당첨금 수령 도우미", claimNone: "직접 수령해야 할 당첨이 없습니다 (200만원 이하 인터넷 당첨금은 예치금으로 자동 지급).",
-      claimVisit: "직접 수령이 필요한 당첨: 신분증을 챙겨 수령처를 방문하세요. 지급기한은 추첨일부터 1년(추정)이며, 정확한 기한·수령처는 동행복권 '당첨금 지급 안내'를 확인하세요.",
+      claimVisit: "지급기한은 추첨일로부터 1년이며, 그날이 은행 휴무일(주말·공휴일)이면 다음 영업일까지입니다. 화면의 날짜는 주말만 반영했으니 공휴일과 겹치면 하루 이상 늘어납니다. 기한이 지나면 당첨금은 복권기금으로 귀속됩니다. (출처: 동행복권 이용안내·당첨자 가이드)",
+      how_auto: "예치금 자동 지급", how_bank_branch: "🏦 농협은행 지점 방문 · 신분증·당첨 복권 번호", how_bank_hq: "🏦 농협은행 본점 방문 · 신분증·당첨 복권 번호",
+      how_online_claim: "💻 동행복권 사이트에서 실명 인증·지급 신청 → 다음 달부터 매월 20일 지급",
       claimAuto: "예치금 자동 지급", claimExpired: "기한 지남", icsBtn: "📅 캘린더 받기 (.ics)",
       icsHint: "추첨·판매 마감·정기 자동 구매·수령 기한이 담긴 파일입니다. 휴대폰·구글 캘린더에서 가져오기 하세요.",
       nWeekly: "📬 주간 리포트 (일요일 09시)", nDeadline: "⏰ 마감 알림 (토요일 18시, 이번 주 미구매 계정)", nClaim: "💰 당첨금 수령 기한 알림 (D-30·7·1)",
@@ -557,7 +559,9 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       budgetTitle: "This month's budget", budgetOff: "No monthly budget — set one per account in ⏰ settings and purchases over it are blocked automatically.",
       budgetUsed: "Used", budgetLeft: "Left", budgetOver: "Budget used up — more purchases this month are blocked.",
       claimTitle: "Prize claim helper", claimNone: "No prizes to claim in person (online prizes up to 2,000,000 won are credited to your deposit).",
-      claimVisit: "Claim in person: bring your ID to the claim office. The deadline is about one year from the draw; check DH Lottery's prize guide for the exact date and place.",
+      claimVisit: "The claim deadline is one year from the draw date; if that day is not a bank business day it moves to the next one. Dates here skip weekends only, so a public holiday can push them later. Unclaimed prizes go to the Lottery Fund. (Source: DH Lottery user guide and winner guide)",
+      how_auto: "Credited to deposit", how_bank_branch: "🏦 Any NH Bank branch · ID and ticket number", how_bank_hq: "🏦 NH Bank head office only · ID and ticket number",
+      how_online_claim: "💻 Verify your name and apply on the DH Lottery site → paid on the 20th of each month from the next month",
       claimAuto: "Credited to deposit", claimExpired: "Expired", icsBtn: "📅 Download calendar (.ics)",
       icsHint: "Draws, sales cut-off, scheduled purchases and claim deadlines. Import it into your phone or Google Calendar.",
       nWeekly: "📬 Weekly report (Sunday 09:00)", nDeadline: "⏰ Cut-off reminder (Saturday 18:00, accounts without tickets)", nClaim: "💰 Prize claim deadline alerts (D-30·7·1)",
@@ -1302,6 +1306,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       body.push(h("div", { cls: "claim " + x.action }, [
         h("span", { text: (insightScope === "all" ? x.label + " · " : "") + (x.game === "lotto" ? t("lottoShort") : t("pensionShort")) + " " + x.round + t("round") + " " + x.info + (x.amount ? " · " + won(x.amount) : "") }),
         h("span", { cls: "dd", text: x.action === "auto" ? t("claimAuto") : (x.days_left >= 0 ? "D-" + x.days_left + " · " + x.deadline : t("claimExpired")) })]));
+      if (x.action !== "auto" && x.how) body.push(h("div", { cls: "hint", text: t("how_" + x.how) }));
     });
     if (visit.length) body.push(h("div", { cls: "hint mt8", text: t("claimVisit") }));
     body.push(h("div", { cls: "btns tight mt10" }, [h("button", { cls: "btn secondary small", type: "button", text: t("icsBtn"), onclick: function () { download("api/calendar.ics"); } })]));

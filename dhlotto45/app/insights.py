@@ -4,7 +4,7 @@ insights.py (v2.12.0)
 
 - 운 지수: 내 당첨 횟수가 확률상 상위 몇 %인지(이항분포 정확 계산, 추첨이 끝난 회차만)
 - 월 예산 가드: 이번 달 지출 + 이번 구매가 예산을 넘으면 구매를 막는다
-- 당첨금 수령 도우미: 회차 → 추첨일 → 지급기한(추정) D-day, 직접 수령이 필요한 당첨 리마인더
+- 당첨금 수령 도우미: 회차 → 추첨일 → 지급기한(추첨일 + 1년, 휴무일이면 다음 영업일) D-day, 등수별 수령 방법, 리마인더
 - 번호 공정성 검정: 카이제곱 적합도 검정(번호 쏠림이 우연 범위인지)
 - 주간 리포트·토요일 마감 알림 문구
 - 가계부(kr_ledger_kit) 연동 묶음
@@ -205,8 +205,52 @@ def budget_status(entries, pending, acct: str, now: datetime, budget: int, cost:
 
 
 # ---------------------------------------------------------------- prize claims
+def claim_deadline(draw: date) -> date:
+    """당첨금 지급기한.
+
+    동행복권 안내: "지급기한은 지급개시일로부터 1년", "지급기한 종료일이 은행 영업일이 아니면 다음 은행
+    영업일이 지급기한 종료일". 보도된 실제 기한과 맞춰 보면 지급개시일 = 추첨일이다
+    (1196회 2025-11-01 추첨 → 2026-11-01(일) → 11-02(월), 1203회 2025-12-20 추첨 → 2026-12-21(월)).
+    주말은 여기서 넘기고, 공휴일(설·추석 등)은 화면·알림에서 "공휴일이면 다음 영업일"로 안내한다.
+    공휴일을 반영하지 않으므로 실제 기한보다 늦게 표시되는 일은 없다.
+    """
+    d = _add_year(draw)
+    while d.weekday() >= 5:
+        d += timedelta(days=1)
+    return d
+
+
+def claim_method(game: str, rank: int, amount: int, info: str = "") -> str:
+    """인터넷 구매 당첨금 수령 방법(동행복권 이용안내·당첨자 가이드 기준).
+
+    로또 6/45: 200만원 이하(3~5등) → 추첨 다음 날 예치금 자동 지급(auto)
+              200만원 초과(2~3등) → NH농협은행 전국 지점(bank_branch), 1등 → NH농협은행 본점만(bank_hq)
+    연금복권720+: 1등·2등·보너스(연금식) → 동행복권 사이트에서 실명 인증·지급 신청(online_claim),
+              3~7등(200만원 이하) → 예치금 자동 지급(auto)
+    """
+    if game == "lotto":
+        if rank == 1:
+            return "bank_hq"
+        if rank == 2 or amount > AUTO_CREDIT_LIMIT or (rank == 3 and amount == 0):
+            return "bank_branch"
+        return "auto"
+    if rank in (1, 2) or "보너스" in info:
+        return "online_claim"
+    if amount > AUTO_CREDIT_LIMIT:
+        return "online_claim"
+    return "auto"
+
+
+CLAIM_GUIDE = {
+    "auto": "예치금으로 자동 지급(추첨 다음 날 06시경)",
+    "bank_branch": "신분증과 당첨 복권 번호를 챙겨 NH농협은행 지점에서 수령",
+    "bank_hq": "신분증과 당첨 복권 번호를 챙겨 NH농협은행 본점에서만 수령",
+    "online_claim": "동행복권 사이트 마이페이지 > 구매/당첨 내역에서 실명 인증·지급 신청 → 신청 다음 달부터 매월 20일 계좌로 지급",
+}
+
+
 def claims(entries, today: date, acct: str = "") -> list:
-    """당첨 기록 → 지급기한(추정)과 수령 방법. 직접 수령(visit)이 필요한 것을 먼저, 기한 순으로."""
+    """당첨 기록 → 지급기한과 수령 방법. 직접 챙겨야 하는 것(visit)을 먼저, 기한 순으로."""
     out = []
     for e in entries or []:
         if e.get("kind") != "win" or (acct and e.get("acct") != acct):
@@ -215,18 +259,16 @@ def claims(entries, today: date, acct: str = "") -> list:
         d = draw_date(game, e.get("round"))
         if d is None:
             continue
-        deadline = _add_year(d)
+        deadline = claim_deadline(d)
         left = (deadline - today).days
         if left < -30:
             continue
         rank, amount, info = _rank_of(e), int(e.get("amount") or 0), str(e.get("info") or "")
-        if game == "lotto":
-            visit = amount > AUTO_CREDIT_LIMIT or (amount == 0 and 0 < rank <= 3)
-        else:
-            visit = rank in (1, 2) or "보너스" in info or amount > AUTO_CREDIT_LIMIT
+        how = claim_method(game, rank, amount, info)
         out.append({"key": e.get("key"), "acct": e.get("acct"), "game": game, "round": int(e.get("round") or 0),
                     "info": info, "amount": amount, "rank": rank, "draw_date": d.isoformat(),
-                    "deadline": deadline.isoformat(), "days_left": left, "action": "visit" if visit else "auto"})
+                    "deadline": deadline.isoformat(), "days_left": left, "how": how,
+                    "action": "auto" if how == "auto" else "visit"})
     out.sort(key=lambda c: (c["action"] != "visit", c["days_left"]))
     return out
 
@@ -262,9 +304,9 @@ def claim_message(label: str, c: dict, stage: int) -> tuple:
     game = "로또 6/45" if c["game"] == "lotto" else "연금복권720+"
     amt = f" {c['amount']:,}원" if c["amount"] else ""
     title = f"💰 당첨금 수령 D-{c['days_left']} ({label})"
-    body = (f"{game} {c['round']}회 {c['info']}{amt} — 지급기한(추정) {c['deadline']}. "
-            "직접 수령이 필요한 당첨입니다: 신분증을 챙겨 수령처를 방문하세요. "
-            "정확한 기한·수령처는 동행복권 '당첨금 지급 안내'를 확인하세요.")
+    guide = CLAIM_GUIDE.get(c.get("how") or "bank_branch", CLAIM_GUIDE["bank_branch"])
+    body = (f"{game} {c['round']}회 {c['info']}{amt} — 지급기한 {c['deadline']}(공휴일이면 다음 은행 영업일). "
+            f"{guide}. 기한이 지나면 당첨금은 복권기금으로 귀속됩니다.")
     return title, body
 
 
@@ -520,8 +562,9 @@ def build_ics(today: date, now_utc: datetime, *, lotto: bool = True, pension: bo
         game = "로또" if c["game"] == "lotto" else "연금복권"
         who = labels.get(c.get("acct"), c.get("acct"))
         dl = date.fromisoformat(c["deadline"])
-        event("claim-" + hashlib.sha1(str(c["key"]).encode("utf-8")).hexdigest()[:16], f"💰 당첨금 수령 기한(추정) · {who} {game} {c['round']}회 {c['info']}",
-              "신분증을 챙겨 수령처를 방문하세요. 정확한 기한·수령처는 동행복권 '당첨금 지급 안내'를 확인하세요.",
+        event("claim-" + hashlib.sha1(str(c["key"]).encode("utf-8")).hexdigest()[:16], f"💰 당첨금 지급기한 · {who} {game} {c['round']}회 {c['info']}",
+              CLAIM_GUIDE.get(c.get("how") or "bank_branch", CLAIM_GUIDE["bank_branch"])
+              + ". 공휴일이면 다음 은행 영업일까지이며, 기한이 지나면 복권기금으로 귀속됩니다.",
               dl.strftime("%Y%m%d"), all_day=True, alarms=("-P30D", "-P7D", "-P1D"))
     head = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//DH Lotto 45//Lucky Lab//KO", "CALSCALE:GREGORIAN",
             "METHOD:PUBLISH", "X-WR-CALNAME:DH Lotto 45", "X-WR-TIMEZONE:Asia/Seoul"]
