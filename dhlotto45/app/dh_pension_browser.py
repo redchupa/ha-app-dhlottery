@@ -58,6 +58,42 @@ MAX_COUNT = 5
 # 20자에서 잘려 로그인이 실패하므로(HTTP 로그인=로또는 전체를 보내 성공) 미리 막는다.
 LOGIN_PW_MAXLEN = 20
 
+# 입력란 채우기(_fill_input). 포커스가 잡히는지 확인한 뒤 키 입력, 안 되면 스크립트로 값 설정.
+FILL_FOCUS_WAIT = 5.0
+FOCUS_JS = (
+    "(e) => { try { e.scrollIntoView({block: 'center'}); } catch (x) {} "
+    "e.focus(); return document.activeElement === e; }"
+)
+VALUE_LEN_JS = "(e) => (e.value || '').length"
+# 실패 진단: 포커스 위치·아이디 입력란 표시 상태(값은 길이만)
+INPUT_DIAG_JS = (
+    "(() => { const a = document.activeElement; "
+    "const all = document.querySelectorAll('#inpUserId'); const i = all[0]; "
+    "let vis = null; if (i) { const s = getComputedStyle(i); "
+    "vis = {display: s.display, visibility: s.visibility, shown: !!i.offsetParent, "
+    "disabled: i.disabled, readOnly: i.readOnly}; } "
+    "const modal = Array.from(document.querySelectorAll("
+    "'.modal, .layer-pop, .popup, [role=dialog]')).some(m => m.offsetParent); "
+    "return JSON.stringify({active: a ? (a.id || a.name || a.tagName) : null, "
+    "idCount: all.length, id: vis, modal: modal}); })()"
+)
+
+
+def set_value_js(value: str) -> str:
+    """입력란 값을 스크립트로 설정하는 JS 함수(문자열 리터럴은 JSON 으로 안전하게 인코딩).
+
+    사이트 이벤트(아이디의 영문·숫자 필터 onchange 등)도 동일하게 돌도록 input/change 를 보낸다.
+    """
+    lit = json.dumps(str(value))
+    return (
+        "(e) => { e.focus(); "
+        "const d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value'); "
+        f"d.set.call(e, ''); d.set.call(e, {lit}); "
+        "e.dispatchEvent(new Event('input', {bubbles: true})); "
+        "e.dispatchEvent(new Event('change', {bubbles: true})); "
+        "return (e.value || '').length; }"
+    )
+
 # 로그인 버튼(login())은 RSA 공개키(rsa.n)가 AJAX 로 설정된 뒤에만 동작한다.
 # 키가 없으면 rsa.encrypt() 가 TypeError 로 죽고 폼이 조용히 제출되지 않는다.
 RSA_READY_JS = "(() => typeof rsa !== 'undefined' && !!rsa && rsa.n != null)()"
@@ -598,8 +634,10 @@ class DhPensionBrowser:
             "(() => { document.querySelectorAll(\"#inpUserId, input[type='password']\")"
             ".forEach(e => { e.value = ''; }); return true; })()",
         )
-        await id_el.send_keys(self.username)
-        await pw_el.send_keys(self.password)
+        id_how = await self._fill_input(id_el, self.username)
+        pw_how = await self._fill_input(pw_el, self.password)
+        if id_how != "keys" or pw_how != "keys":
+            self._log.info(f"[PENSION-BR] 입력 보정: 아이디={id_how}, 비밀번호={pw_how}")
 
         # 입력값이 실제로 들어갔는지 확인(키 이벤트 누락·maxlength 잘림 감지).
         # JS value.length 는 UTF-16 단위라 같은 기준으로 비교한다.
@@ -621,10 +659,13 @@ class DhPensionBrowser:
         got_pw = lens.get("pw", -1) if isinstance(lens, dict) else -1
         # -1 = 필드를 못 찾음(사이트 구조 변경) → 이 검사만 건너뛰고 기존 흐름 유지
         if (got_id >= 0 and got_id != exp_id) or (got_pw >= 0 and got_pw != exp_pw):
+            diag = await self._safe_eval(tab, INPUT_DIAG_JS)
             raise DhPensionBrowserError(
                 "로그인 실패: 입력란에 아이디/비밀번호가 정상 입력되지 않았습니다 "
-                f"(입력된 길이 id={got_id}/{exp_id}, pw={got_pw}/{exp_pw}). "
-                "아이디는 영문·숫자만 허용되고, 비밀번호는 20자 이하여야 합니다."
+                f"(입력된 길이 id={got_id}/{exp_id}, pw={got_pw}/{exp_pw}, "
+                f"방식 id={id_how}, pw={pw_how}). "
+                "아이디는 영문·숫자만 허용되고, 비밀번호는 20자 이하여야 합니다. "
+                f"입력란상태={diag}"
             )
 
         btn = await self._wait_first(tab, LOGIN_BTN_SELECTORS, 5.0)
@@ -651,6 +692,42 @@ class DhPensionBrowser:
         self._log.info(
             f"[PENSION-BR] 로그인 성공 ({time.monotonic() - t0:.1f}s)"
         )
+
+    async def _fill_input(self, el, value: str) -> str:
+        """입력란에 값을 넣고 방식("keys"|"script"|"fail")을 반환한다.
+
+        1) 입력란에 포커스가 실제로 잡힐 때까지 최대 FILL_FOCUS_WAIT 초 기다린 뒤 키 입력.
+           느린 기기에서는 폼이 늦게 보이거나 다른 요소가 포커스를 가져가 키 입력이
+           허공으로 사라질 수 있다(제보: id=0/9 인데 pw 는 정상).
+        2) 길이가 안 맞으면 값을 비우고 스크립트로 넣은 뒤 input/change 이벤트를 보낸다.
+           사이트 login() 은 클릭 시점의 입력란 값을 읽어 암호화하므로 결과는 같다.
+        값(비밀번호)은 로그에 남기지 않는다.
+        """
+        expected = len(value.encode("utf-16-le")) // 2
+        deadline = time.monotonic() + FILL_FOCUS_WAIT
+        focused = False
+        while True:
+            focused = bool(await self._safe_apply(el, FOCUS_JS))
+            if focused or time.monotonic() >= deadline:
+                break
+            await asyncio.sleep(0.3)
+        if focused:
+            try:
+                await el.send_keys(value)
+            except Exception as e:  # noqa: BLE001
+                self._log.debug(f"[PENSION-BR] 키 입력 오류: {type(e).__name__}")
+            if await self._safe_apply(el, VALUE_LEN_JS) == expected:
+                return "keys"
+        n = await self._safe_apply(el, set_value_js(value))
+        return "script" if n == expected else "fail"
+
+    async def _safe_apply(self, el, js: str):
+        """요소에 JS 함수 적용. 실패 시 None(스크립트 내용은 비밀번호를 담을 수 있어 기록하지 않음)."""
+        try:
+            return await el.apply(js)
+        except Exception as e:  # noqa: BLE001
+            self._log.debug(f"[PENSION-BR] 요소 스크립트 실패: {type(e).__name__}")
+            return None
 
     async def _ensure_rsa_ready(self, tab) -> None:
         """로그인 페이지의 RSA 공개키(rsa.n) 설정 완료를 기다린다.

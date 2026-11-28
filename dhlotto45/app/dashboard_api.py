@@ -44,6 +44,23 @@ def account_aliases(usernames) -> dict:
     return {u: (f"account_{i}", f"Account_{i}") for i, u in enumerate(usernames or [], start=1)}
 
 
+def configured_usernames(account_configs, max_accounts: int) -> list:
+    """init_clients 가 accounts 에 등록할 아이디 목록을 같은 규칙으로 미리 계산한다.
+
+    아이디·비밀번호가 빈 항목과 중복 아이디는 건너뛰고, 최대 max_accounts 개까지.
+    """
+    out = []
+    for acc in account_configs or []:
+        if len(out) >= max_accounts:
+            break
+        if not isinstance(acc, dict):
+            continue
+        u = acc.get("username", "")
+        if u and acc.get("password", "") and u not in out:
+            out.append(u)
+    return out
+
+
 def resolve_alias(usernames, alias):
     """별칭(account_N) → 실제 username. 없으면 None."""
     for u, (aid, _label) in account_aliases(usernames).items():

@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bashio
 
-bashio::log.info "Starting Lotto 45 Add-on v2.6.0 (Multi-Account)..."
+bashio::log.info "Starting Lotto 45 Add-on v2.6.1 (Multi-Account)..."
 
 # Build accounts JSON array properly (최대 4계정 제한)
 MAX_ACCOUNTS=4
@@ -39,8 +39,7 @@ export ACCOUNTS="${ACCOUNTS_JSON}"
 bashio::log.info "Accounts JSON built successfully"
 
 # Other configuration
-export ENABLE_LOTTO645=$(bashio::config 'enable_lotto645')
-export ENABLE_PENSION720=$(bashio::config 'enable_pension720')
+# 로또6/45·연금복권720+·MQTT 는 항상 사용(설정 옵션 없음, main.py 에 고정)
 export UPDATE_INTERVAL=$(bashio::config 'update_interval')
 
 # 연금복권720+ 구매용 크로미움 경로 탐지(Alpine 패키지에 따라 바이너리 이름이 다름)
@@ -52,7 +51,6 @@ else
     export CHROMIUM_PATH=""
     bashio::log.warning "chromium 미설치 — 연금복권 구매 비활성(조회/로또645는 정상)"
 fi
-export USE_MQTT=$(bashio::config 'use_mqtt')
 export SUPERVISOR_TOKEN="${SUPERVISOR_TOKEN}"
 
 # MQTT configuration (optional)
@@ -65,13 +63,8 @@ export HA_URL="http://supervisor/core"
 
 bashio::log.info "Configuration loaded:"
 bashio::log.info "  Update interval: ${UPDATE_INTERVAL}s"
-bashio::log.info "  Lotto 645 enabled: ${ENABLE_LOTTO645}"
-bashio::log.info "  Pension720 enabled: ${ENABLE_PENSION720} (chromium: ${CHROMIUM_PATH:-none})"
-bashio::log.info "  Use MQTT: ${USE_MQTT}"
-
-if bashio::config.true 'use_mqtt'; then
-    bashio::log.info "  MQTT URL: ${MQTT_URL}"
-fi
+bashio::log.info "  Pension720 chromium: ${CHROMIUM_PATH:-none}"
+bashio::log.info "  MQTT URL: ${MQTT_URL}"
 
 # Run Python application
 bashio::log.info "Starting application..."

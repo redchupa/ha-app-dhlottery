@@ -94,10 +94,7 @@ accounts:
   # - username: "family_account_2"
   #   password: "family_password_2"
   #   enabled: true
-enable_lotto645: true
-enable_pension720: true
 update_interval: 3600   # 센서 갱신 주기(초), 기본 1시간
-use_mqtt: true
 mqtt_url: "mqtt://homeassistant.local:1883"
 mqtt_username: ""
 mqtt_password: ""
@@ -1873,7 +1870,7 @@ MQTT Discovery를 활성화하면 자동 구매 버튼이 생성됩니다.
 | 다중 계정 구매 차단 | 다른 계정 구매 및 조회 완료 후 **20초**가 지나야 다음 계정 구매가 가능합니다. HA 자동화에서 액션 간 `delay: "00:00:30"` 이상을 추가하세요. |
 | 5번째 이상 계정 미로드 | 보안 정책상 최대 **4계정**까지만 지원합니다. |
 | 센서 미갱신 | `update_interval` 확인. `homeassistant.update_entity` 서비스로 수동 호출. |
-| MQTT 센서 미생성 | `use_mqtt: true` / MQTT 브로커 동작 / `mqtt_url` 정확성 확인. 애드온 재시작. |
+| MQTT 센서 미생성 | MQTT 브로커 동작 / `mqtt_url` 정확성 확인. 애드온 재시작. |
 | 구매 실패 | 시간 / 예치금 / 주간 5게임 한도 / Log 탭 에러 메시지 확인. |
 | 포트 충돌 | 60099 점유 애드온 확인. |
 

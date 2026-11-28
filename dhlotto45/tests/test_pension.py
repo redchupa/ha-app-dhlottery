@@ -22,6 +22,7 @@ from dh_pension_browser import (  # noqa: E402
     browser_connect_kwargs,
     classify_purchase_failure,
     is_login_success_url,
+    set_value_js,
     validate_login_credentials,
     validate_manual_selection,
 )
@@ -242,6 +243,47 @@ s = H.summarize(338, wgames, 1, 5000)
 check("당첨 1매" in s and "5,000" in s, "summarize 당첨")
 lgames = H.build_round([{"gmInfo": "1:111111", "ltWnResult": "낙첨"}])[0]
 check("모두 낙첨" in H.summarize(338, lgames, 0, 0), "summarize 낙첨")
+
+# ------------------------------------------------ set_value_js (v2.6.1 입력 보정)
+print("[set_value_js]")
+import json as _json  # noqa: E402
+import shutil as _shutil  # noqa: E402
+import subprocess as _sp  # noqa: E402
+
+tricky = [
+    "sampleid01",
+    "Pw!@#$%^&*()_+",
+    "a'b\"c\\d`e${x}",
+    "</script><b>",
+    "한글비번\u2028\u2029끝",
+    "",
+]
+for v in tricky:
+    check(_json.dumps(v) in set_value_js(v), f"JSON 리터럴 포함 {v[:8]!r}")
+node = _shutil.which("node")
+if node:
+    # 가짜 입력란으로 실제 실행: 값이 그대로 들어가고 input/change 이벤트가 나가는지
+    harness = (
+        "class HTMLInputElement {}; "
+        "Object.defineProperty(HTMLInputElement.prototype, 'value', "
+        "{get(){return this._v||''}, set(x){this._v=x}, configurable:true}); "
+        "class Event { constructor(t){this.type=t} }; "
+        "const out=[]; for (const [v, src] of JSON.parse(process.argv[1])) { "
+        "const e = new HTMLInputElement(); e.ev=[]; e.focus=()=>{}; "
+        "e.dispatchEvent=(x)=>e.ev.push(x.type); const n = eval(src)(e); "
+        "out.push({ok: e.value===v, n, ev: e.ev.join(',')}); } "
+        "console.log(JSON.stringify(out));"
+    )
+    arg = _json.dumps([[v, set_value_js(v)] for v in tricky])
+    res = _json.loads(
+        _sp.run([node, "-e", harness, arg], capture_output=True, text=True,
+                encoding="utf-8", check=True).stdout
+    )
+    for v, r in zip(tricky, res):
+        check(r["ok"] and r["n"] == len(v.encode("utf-16-le")) // 2 and r["ev"] == "input,change",
+              f"node 실행 {v[:8]!r} -> {r}")
+else:
+    print("  (node 없음: 실행 검사 건너뜀)")
 
 # ------------------------------------------------ result
 print(f"\n{PASS} passed, {FAIL} failed")

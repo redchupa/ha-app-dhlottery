@@ -159,5 +159,33 @@ m = D.merge_prefs({"theme": "clover", "lang": "en"}, {"theme": "galaxy", "unknow
 check(m["theme"] == "galaxy" and m["lang"] == "en" and "unknown" not in m and "rev" not in m, "부분 병합·미지원 키 제거")
 check(D.merge_prefs({"theme": "clover"}, "bad")["theme"] == "clover", "잘못된 변경은 무시")
 
+# ------------------------------------------------ configured_usernames (v2.6.1)
+print("[configured_usernames]")
+cfgs = [
+    {"username": "sampleid01", "password": "a"},
+    {"username": "", "password": "a"},            # 빈 아이디
+    {"username": "sampleid02", "password": ""},   # 빈 비밀번호
+    {"username": "sampleid01", "password": "b"},  # 중복
+    "bad",
+    {"username": "sampleid03", "password": "c"},
+    {"username": "sampleid04", "password": "d"},
+    {"username": "sampleid05", "password": "e"},
+    {"username": "sampleid06", "password": "f"},
+]
+check(D.configured_usernames(cfgs, 4) == ["sampleid01", "sampleid03", "sampleid04", "sampleid05"],
+      "건너뛰기·최대 4개")
+check(D.configured_usernames(None, 4) == [] and D.configured_usernames([], 4) == [], "빈 설정")
+# 회귀(v2.6.0): 필터를 accounts 등록 전에 설치해 빈 목록이 되던 문제 → 설정 목록 기준으로 치환돼야 함
+import io as _io  # noqa: E402
+_buf = _io.StringIO()
+_h = logging.StreamHandler(_buf)
+_h.addFilter(D.AliasLogFilter(D.account_aliases(D.configured_usernames(cfgs, 4))))
+_lg = logging.getLogger("t_alias_regress")
+_lg.propagate = False
+_lg.addHandler(_h)
+_lg.error("[PENSION][sampleid03] Purchase failed (uncertain=False): x")
+_out = _buf.getvalue()
+check("sampleid03" not in _out and "[PENSION][Account_2]" in _out, "설정 기준 필터 → Account_2")
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.6.0
+Lotto 45 Add-on Main Application v2.6.1
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -41,6 +41,7 @@ from dashboard_api import (
     PENSION_ACTIONS,
     DashboardInputError,
     AliasLogFilter,
+    configured_usernames,
     account_aliases,
     action_label,
     csrf_ok,
@@ -107,15 +108,16 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.6.0"
+APP_VERSION = "2.6.1"
 
 # Configuration variables
 config = {
     "accounts": [],
-    "enable_lotto645": os.getenv("ENABLE_LOTTO645", "true").lower() == "true",
-    "enable_pension720": os.getenv("ENABLE_PENSION720", "true").lower() == "true",
+    # 로또6/45·연금복권720+·MQTT 는 항상 사용한다(v2.6.1 부터 설정 옵션 제거, 변경 불가).
+    "enable_lotto645": True,
+    "enable_pension720": True,
     "update_interval": clamp_update_interval(int(os.getenv("UPDATE_INTERVAL", "3600"))),
-    "use_mqtt": os.getenv("USE_MQTT", "false").lower() == "true",
+    "use_mqtt": True,
     "ha_url": os.getenv("HA_URL", "http://supervisor/core"),
     "supervisor_token": os.getenv("SUPERVISOR_TOKEN", ""),
     "is_beta": os.getenv("IS_BETA", "false").lower() == "true",
@@ -907,7 +909,9 @@ async def init_clients():
     global mqtt_client
     
     load_accounts_from_env()
-    install_log_alias_filter(list(accounts.keys()))
+    # accounts 는 아래 루프에서 채워지므로 설정 목록으로 미리 별칭 필터를 건다
+    # (대시보드와 같은 순서·같은 건너뛰기 규칙 → Account_N 번호 일치).
+    install_log_alias_filter(configured_usernames(config["accounts"], MAX_ACCOUNTS))
     
     if not config["accounts"]:
         logger.error("No accounts configured")
