@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.6.1
+Lotto 45 Add-on Main Application v2.6.2
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -108,7 +108,8 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.6.1"
+APP_VERSION = "2.6.2"
+FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
 config = {
@@ -116,7 +117,7 @@ config = {
     # 로또6/45·연금복권720+·MQTT 는 항상 사용한다(v2.6.1 부터 설정 옵션 제거, 변경 불가).
     "enable_lotto645": True,
     "enable_pension720": True,
-    "update_interval": clamp_update_interval(int(os.getenv("UPDATE_INTERVAL", "3600"))),
+    "update_interval": clamp_update_interval(FIXED_UPDATE_INTERVAL),  # 고정(설정 불가)
     "use_mqtt": True,
     "ha_url": os.getenv("HA_URL", "http://supervisor/core"),
     "supervisor_token": os.getenv("SUPERVISOR_TOKEN", ""),
@@ -946,7 +947,7 @@ async def init_clients():
         
         client_id_suffix = "_beta" if config["is_beta"] else ""
         mqtt_client = MQTTDiscovery(
-            mqtt_url=os.getenv("MQTT_URL", "mqtt://homeassistant.local:1883"),
+            mqtt_url=os.getenv("MQTT_URL") or "mqtt://core-mosquitto:1883",
             username=os.getenv("MQTT_USERNAME"),
             password=os.getenv("MQTT_PASSWORD"),
             client_id_suffix=client_id_suffix,

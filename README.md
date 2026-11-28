@@ -94,11 +94,32 @@ accounts:
   # - username: "family_account_2"
   #   password: "family_password_2"
   #   enabled: true
-update_interval: 3600   # 센서 갱신 주기(초), 기본 1시간
-mqtt_url: "mqtt://homeassistant.local:1883"
-mqtt_username: ""
+mqtt_url: "mqtt://core-mosquitto:1883"   # Mosquitto broker 애드온이면 그대로
+mqtt_username: ""                        # 비워 두면 Mosquitto broker 접속 정보 자동 사용(권장)
 mqtt_password: ""
 ```
+
+> 로또6/45·연금복권720+·MQTT 는 항상 켜져 있고, 센서 갱신 주기는 1시간(3600초)으로 고정입니다.
+
+### MQTT 준비 (Mosquitto broker)
+
+이 애드온은 MQTT Discovery 로 센서·버튼을 만들기 때문에 **MQTT 브로커가 꼭 필요**합니다.
+
+1. **Mosquitto broker 설치**: 설정 → 애드온(앱) → 애드온 스토어 → `Mosquitto broker` 설치 → 시작.
+2. **MQTT 통합 추가**: 설정 → 기기 및 서비스에 `MQTT` 가 발견되면 **구성** → 확인. (안 보이면 통합 추가 → MQTT)
+3. **이 애드온 MQTT 칸**
+   - **권장(자동)**: `mqtt_username`·`mqtt_password` 를 **비워 두세요**. Mosquitto broker 가 이 애드온 전용 접속 정보를 자동으로 넘겨줍니다. 로그에 `MQTT: mqtt://core-mosquitto:1883 (auto (Mosquitto broker), user: set)` 이 보이면 정상.
+   - **직접 입력**: 먼저 계정을 만든 뒤 입력합니다. 둘 중 하나:
+     - 설정 → 사람 → **사용자 추가** → 이름 예: `mqtt_dhlotto`, 비밀번호 지정 (로그인 허용은 꺼도 됨)
+     - Mosquitto broker 애드온 → 구성 → `logins` 에 추가:
+       ```yaml
+       logins:
+         - username: mqtt_dhlotto
+           password: your_mqtt_password
+       ```
+     그 다음 이 애드온에 `mqtt_username: mqtt_dhlotto`, `mqtt_password: your_mqtt_password` 입력.
+   - **다른 기기의 브로커**: `mqtt_url: "mqtt://브로커주소:1883"` (예: `mqtt://mqtt.example.local:1883`) + 그 브로커의 아이디·비밀번호.
+4. 애드온 재시작 → 로그에서 `MQTT connected` 확인.
 
 4. **Start** 클릭 → **Log** 탭에서 `Login successful` 확인
 
@@ -1869,8 +1890,8 @@ MQTT Discovery를 활성화하면 자동 구매 버튼이 생성됩니다.
 | 로그인 실패 | 동행복권 웹에서 직접 로그인 테스트 → 5회 실패 시 잠금. 잠시 대기 후 재시도. 2차 인증(OTP) 계정은 미지원. |
 | 다중 계정 구매 차단 | 다른 계정 구매 및 조회 완료 후 **20초**가 지나야 다음 계정 구매가 가능합니다. HA 자동화에서 액션 간 `delay: "00:00:30"` 이상을 추가하세요. |
 | 5번째 이상 계정 미로드 | 보안 정책상 최대 **4계정**까지만 지원합니다. |
-| 센서 미갱신 | `update_interval` 확인. `homeassistant.update_entity` 서비스로 수동 호출. |
-| MQTT 센서 미생성 | MQTT 브로커 동작 / `mqtt_url` 정확성 확인. 애드온 재시작. |
+| 센서 미갱신 | 갱신 주기는 1시간 고정. `homeassistant.update_entity` 서비스로 수동 호출. |
+| MQTT 센서 미생성 | Mosquitto broker 실행 여부, MQTT 통합 추가 여부 확인. 아이디를 직접 넣었다면 계정·비밀번호 확인(비워 두면 자동). 로그의 `MQTT connected` 확인 후 재시작. |
 | 구매 실패 | 시간 / 예치금 / 주간 5게임 한도 / Log 탭 에러 메시지 확인. |
 | 포트 충돌 | 60099 점유 애드온 확인. |
 

@@ -1,0 +1,23 @@
+configuration:
+  accounts:
+    name: 동행복권 계정
+    description: >-
+      동행복권(dhlottery.co.kr) 아이디·비밀번호. 최대 4개까지 등록되며 위에서부터 Account_1,
+      Account_2 … 로 표시됩니다. 아이디는 영문·숫자, 비밀번호는 20자 이하여야 연금복권 구매가 됩니다.
+      enabled 를 끄면 그 계정은 건너뜁니다.
+  mqtt_url:
+    name: MQTT 브로커 주소
+    description: >-
+      Mosquitto broker 애드온을 쓰면 mqtt://core-mosquitto:1883 그대로 두세요.
+      다른 기기의 브로커라면 mqtt://브로커주소:1883 형식(예: mqtt://mqtt.example.local:1883).
+      아래 MQTT 사용자 이름을 비워 두면 Mosquitto broker 의 접속 정보를 자동으로 사용합니다.
+  mqtt_username:
+    name: MQTT 사용자 이름
+    description: >-
+      비워 두면 자동 설정(Mosquitto broker 애드온 필요, 권장). 직접 넣으려면 먼저 계정을 만드세요:
+      설정 → 사람 → 사용자 추가에서 MQTT 전용 사용자(예: mqtt_dhlotto)를 만들거나,
+      Mosquitto broker 애드온 구성의 logins 에 username/password 를 추가한 뒤 그 아이디를 입력합니다.
+  mqtt_password:
+    name: MQTT 비밀번호
+    description: >-
+      위 MQTT 사용자 이름에 맞는 비밀번호. 사용자 이름을 비워 자동 설정을 쓸 때는 비워 두세요.

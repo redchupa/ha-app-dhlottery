@@ -21,6 +21,7 @@ from dh_pension_browser import (  # noqa: E402
     DhPensionBrowserError,
     browser_connect_kwargs,
     classify_purchase_failure,
+    ID_SELECTORS,
     is_login_success_url,
     set_value_js,
     validate_login_credentials,
@@ -284,6 +285,11 @@ if node:
               f"node 실행 {v[:8]!r} -> {r}")
 else:
     print("  (node 없음: 실행 검사 건너뜀)")
+
+# ------------------------------------------------ ID_SELECTORS (v2.6.2 회귀)
+print("[ID_SELECTORS]")
+check(not any("userId" in s and "inpUserId" not in s for s in ID_SELECTORS), "hidden #userId 를 가리키는 셀렉터 없음")
+check(ID_SELECTORS[0] == "#inpUserId", "첫 후보는 #inpUserId")
 
 # ------------------------------------------------ result
 print(f"\n{PASS} passed, {FAIL} failed")

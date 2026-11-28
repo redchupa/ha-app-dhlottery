@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.6.2 - 2026-11-28
+
+### Fixed
+- **연금복권 로그인 아이디가 계속 비던 문제의 실제 원인**: 로그인 폼에는 암호문용 hidden 필드 `#userId` 가 진짜 입력란 `#inpUserId` 바로 앞에 있다. 느린 기기에서 페이지가 조각나 도착하면 hidden 필드를 먼저 잡아 거기에 값을 넣고 있었다(`방식 id=script` 인데 `id=0/9`). hidden 필드를 가리키는 셀렉터를 없애고, 문서 파싱이 끝난 뒤 입력란을 다시 찾으며, hidden 필드에는 입력하지 않는다.
+- **비밀번호에 `"`·`\` 가 있으면 계정 설정이 깨지던 문제**: run.sh 가 계정 JSON 을 문자열로 이어 붙이던 방식을 jq 로 교체.
+- 입력 실패 진단의 팝업 감지 보강(사이트 알림창 `.popup-wrap`, `role=alertdialog`).
+
+### Changed
+- `update_interval` 옵션 제거 — 센서 갱신 주기 3600초 고정.
+- MQTT: 아이디를 비워 두면 Mosquitto broker 애드온의 접속 정보를 자동 사용(`services: mqtt:want`). 기본 주소 `mqtt://core-mosquitto:1883`.
+- 설정 화면 한국어/영어 설명 추가(`translations/`): MQTT 입력 예시와 Mosquitto 계정 준비 방법.
+- zendriver 버전 고정(0.17.1), Supervisor watchdog(`/health`) 추가.
+- GitHub Actions: 단위 테스트 + gitleaks 비밀값·사설 IP 검사.
+
 ## 2.6.1 - 2026-11-28
 
 ### Fixed

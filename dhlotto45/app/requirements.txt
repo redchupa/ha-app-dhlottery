@@ -5,4 +5,4 @@ paho-mqtt>=2.0.0,<3.0.0
 python-dateutil>=2.8.0,<3.0.0
 requests>=2.31.0,<3.0.0
 pycryptodome>=3.20.0,<4.0.0
-zendriver>=0.17.0,<1.0.0
+zendriver==0.17.1  # 고정: 사용자별 설치 시점 차이로 동작이 달라지지 않게(0.17.1 에서 검증)

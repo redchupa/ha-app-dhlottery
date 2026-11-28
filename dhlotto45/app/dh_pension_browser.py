@@ -31,11 +31,14 @@ DEFAULT_GAME_URL = "https://el.dhlottery.co.kr/game_mobile/pension720/game.jsp"
 # 로그인 폼 셀렉터(여러 후보를 순서대로 시도해 사이트 변경에 견디게 함).
 # dhlottery 로그인 페이지의 평문 아이디 필드는 inpUserId(HTTP 로그인도 동일 필드명 사용).
 # 비밀번호 표시 필드명은 확실치 않아 포괄 셀렉터(type=password)까지 둔다.
+# 주의: 같은 폼의 #userId / #userPswdEncn 은 RSA 암호문을 담는 hidden 필드다.
+# 느린 기기에서 페이지가 조각나 도착하면 hidden #userId 가 #inpUserId 보다 먼저 파싱돼
+# 그쪽을 잡아 아이디가 비는 문제가 있었다(v2.6.1 제보: id=0/9, 방식 id=script).
+# 그래서 hidden 필드를 가리킬 수 있는 셀렉터는 두지 않고, 보이는 텍스트 입력란만 찾는다.
 ID_SELECTORS = (
     "#inpUserId",
     "input[name='inpUserId']",
-    "#userId",
-    "input[name='userId']",
+    "input.login-id:not([type='hidden'])",
 )
 PW_SELECTORS = (
     "#inpUserPswd",
@@ -65,6 +68,7 @@ FOCUS_JS = (
     "e.focus(); return document.activeElement === e; }"
 )
 VALUE_LEN_JS = "(e) => (e.value || '').length"
+DOM_PARSED_JS = "document.readyState !== 'loading'"
 # 실패 진단: 포커스 위치·아이디 입력란 표시 상태(값은 길이만)
 INPUT_DIAG_JS = (
     "(() => { const a = document.activeElement; "
@@ -73,7 +77,8 @@ INPUT_DIAG_JS = (
     "vis = {display: s.display, visibility: s.visibility, shown: !!i.offsetParent, "
     "disabled: i.disabled, readOnly: i.readOnly}; } "
     "const modal = Array.from(document.querySelectorAll("
-    "'.modal, .layer-pop, .popup, [role=dialog]')).some(m => m.offsetParent); "
+    "'.modal, .layer-pop, .popup, .popup-wrap.on, [role=dialog], [role=alertdialog]'))"
+    ".some(m => m.getClientRects().length > 0); "
     "return JSON.stringify({active: a ? (a.id || a.name || a.tagName) : null, "
     "idCount: all.length, id: vis, modal: modal}); })()"
 )
@@ -628,6 +633,11 @@ class DhPensionBrowser:
         # RSA 공개키가 준비되기 전에 클릭하면 login() 이 조용히 실패한다(느린 기기·망).
         await self._ensure_rsa_ready(tab)
 
+        # 문서 파싱이 끝난 뒤 입력란을 다시 찾는다(조각 도착 중 잡은 참조를 쓰지 않음).
+        await self._wait_js(tab, DOM_PARSED_JS, timeout=max(15.0, self.nav_timeout))
+        id_el = await self._wait_first(tab, ID_SELECTORS, 5.0) or id_el
+        pw_el = await self._wait_first(tab, PW_SELECTORS, 5.0) or pw_el
+
         # 아이디 저장 쿠키 등으로 미리 채워진 값이 있으면 뒤에 덧붙지 않도록 비운다.
         await self._safe_eval(
             tab,
@@ -704,6 +714,9 @@ class DhPensionBrowser:
         값(비밀번호)은 로그에 남기지 않는다.
         """
         expected = len(value.encode("utf-16-le")) // 2
+        # hidden 등 입력할 수 없는 필드를 잘못 잡았으면 채우지 않는다(오입력 방지).
+        if await self._safe_apply(el, "(e) => e.type") == "hidden":
+            return "hidden"
         deadline = time.monotonic() + FILL_FOCUS_WAIT
         focused = False
         while True:

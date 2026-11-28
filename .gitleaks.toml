@@ -1,0 +1,24 @@
+# gitleaks 설정: 기본 규칙(API 키·토큰 등) + 이 저장소 전용 규칙.
+# 실제 아이디·도메인은 이 파일에 적으면 그 자체로 노출되므로 일반 패턴만 둔다.
+title = "ha-app-dhlottery"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "private-ipv4"
+description = "사설 IP 주소(집 네트워크 주소 노출 방지)"
+regex = '''\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b'''
+tags = ["privacy"]
+  [rules.allowlist]
+  # Supervisor Ingress 프록시·내부망 주소(모든 HA 에서 같음, 코드·테스트에 필요)
+  regexes = ['''172\.30\.32\.\d{1,3}''']
+
+[[rules]]
+id = "password-assignment"
+description = "설정 예시에 들어간 실제 비밀번호 의심"
+regex = '''(?i)(password|passwd|pw)\s*[:=]\s*["']([^"'\s]{6,})["']'''
+secretGroup = 2
+tags = ["privacy"]
+  [rules.allowlist]
+  regexes = ['''(?i)your_|example|dummy|sample|my_password|_password_?\d*$|test|placeholder|\*\*\*|<[^>]+>''']
