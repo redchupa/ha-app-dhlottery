@@ -202,7 +202,7 @@ THEMES = (
     "neon-draw", "aurora", "galaxy",                                      # 밤하늘·미래
 )
 CARD_IDS = ("summary", "buy", "receipt", "favorites", "lotto_current", "lotto_prev", "pension_current", "pension_prev",
-            "winning", "numstats", "stats", "auto")
+            "winning", "numstats", "stats", "insight", "auto")
 LUCKY_MESSAGE_MAX = 40
 # 자주 안 쓰는 카드는 처음에 접어 둔다(제목만 보이고 누르면 펼쳐짐).
 DEFAULT_COLLAPSED = ("receipt", "winning", "numstats", "stats", "auto")

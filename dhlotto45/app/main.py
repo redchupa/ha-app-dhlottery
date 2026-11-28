@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.11.4
+Lotto 45 Add-on Main Application v2.12.0
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -27,6 +27,7 @@ import uvicorn
 
 from dh_lottery_client import DhLotteryClient, DhLotteryError, DhLotteryLoginError
 import features as FT
+import insights as IN
 from dh_lotto_645 import DhLotto645, DhLotto645SelMode, DhLotto645Error, _rank_drawed_to_result
 from dh_lotto_analyzer import DhLottoAnalyzer
 from dh_mobile_api import DhMobileApiClient, DhMobileApiError
@@ -116,7 +117,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.11.4"
+APP_VERSION = "2.12.0"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -473,6 +474,15 @@ async def execute_pension_purchase(account: AccountData, count: int):
         logger.error(f"[PENSION][{mask_username(username)}] Pension720 not enabled")
         return
 
+    reason = _budget_block_reason(account, count * 1000)
+    if reason:
+        logger.warning(f"[PENSION][{mask_username(username)}] 월 예산 초과로 구매 안 함")
+        await publish_sensor_for_account(account, "pension720_purchase_error", reason[:255], {
+            "error": reason, "timestamp": datetime.now(timezone.utc).isoformat(),
+            "friendly_name": "연금복권 구매 오류", "icon": "mdi:wallet-outline",
+        })
+        return
+
     # 1일 구매 상한선(Hard Limit) 검증 (오구매/예치금 소진 방지)
     try:
         pension_daily_tracker.check_allowed(username, count)
@@ -506,6 +516,7 @@ async def execute_pension_purchase(account: AccountData, count: int):
         # 헤드리스 브라우저가 구매 시작 시 자체 로그인하므로 HTTP 선로그인은 불필요.
         # 브라우저가 멈춰도 버튼이 영원히 매달리지 않도록 전체 타임아웃(180s)을 건다.
         purchase_attempted = True
+        _note_spend(account, count * 1000)
         result = await asyncio.wait_for(
             account.pension.async_buy_auto(count), timeout=180
         )
@@ -635,6 +646,15 @@ async def execute_pension_manual_purchase(account: AccountData):
         })
         return
 
+    reason = _budget_block_reason(account, 1000)
+    if reason:
+        logger.warning(f"[PENSION][{mask_username(username)}] 월 예산 초과로 수동 구매 안 함")
+        await publish_sensor_for_account(account, "pension720_purchase_error", reason[:255], {
+            "error": reason, "timestamp": datetime.now(timezone.utc).isoformat(),
+            "friendly_name": "연금복권 구매 오류", "icon": "mdi:wallet-outline",
+        })
+        return
+
     # 1일 구매 상한선(Hard Limit) 검증 (오구매/예치금 소진 방지)
     try:
         pension_daily_tracker.check_allowed(username, 1)
@@ -666,6 +686,7 @@ async def execute_pension_manual_purchase(account: AccountData):
     purchase_attempted = False
     try:
         purchase_attempted = True
+        _note_spend(account, 1000)
         result = await asyncio.wait_for(
             account.pension.async_buy_manual(group, digits), timeout=180
         )
@@ -840,6 +861,12 @@ async def execute_button_purchase(account: AccountData, button_id: str):
             await publish_purchase_error(account, f"Error: {str(e)}")
             return
 
+    reason = _budget_block_reason(account, 1000 if button_id in ("buy_manual", "buy_auto_1") else WEEKLY_LOTTO_LIMIT * 1000)
+    if reason:
+        logger.warning(f"[PURCHASE][{mask_username(username)}] 월 예산 초과로 구매 안 함")
+        await publish_purchase_error(account, reason)
+        return
+
     # 2) 다중 계정 동시 구매 차단 및 계정 간 20초 쿨다운 검사
     try:
         purchase_guard.acquire(username)
@@ -870,6 +897,7 @@ async def execute_button_purchase(account: AccountData, button_id: str):
         max_games = 1 if button_id in ("buy_manual", "buy_auto_1") else WEEKLY_LOTTO_LIMIT  # 1계정 주간 최대 5게임
         logger.info(f"[PURCHASE][{username}] Executing: {len(slots)} game(s)")
         purchase_attempted = True
+        _note_spend(account, len(slots) * 1000)
         result = await account.lotto_645.async_buy(slots, max_games=max_games)
 
         logger.info(f"[PURCHASE][{username}] Success! Round: {result.round_no}")
@@ -2495,6 +2523,9 @@ async def api_purchase(request: Request):
 
     if account.last_action and account.last_action.get("status") == "running":
         raise HTTPException(status_code=409, detail="이 계정의 이전 구매가 아직 진행 중입니다.")
+    reason = _budget_block_reason(account, action_label(action)[1])
+    if reason:
+        raise HTTPException(status_code=400, detail=reason)
 
     ha_user = request.headers.get("X-Remote-User-Name") or "?"
     logger.info(f"[DASH][{mask_username(username)}] 구매 요청: {action} (HA 사용자: {ha_user})")
@@ -2638,7 +2669,44 @@ async def api_number_stats(request: Request, rounds: int = 50):
     rounds = max(10, min(100, int(rounds)))
     draws = await _round_history()
     data = FT.number_stats(draws, await _cumulative_stats(), rounds)
+    nums = data.get("numbers") or []
+    data["fairness"] = {
+        "window": IN.chi_square_uniform([x.get("count") or 0 for x in nums]) if nums else None,
+        "total": IN.chi_square_uniform([x.get("total") or 0 for x in nums]) if nums and all(x.get("total") for x in nums) else None,
+    }
     return JSONResponse(data, headers=_SECURITY_HEADERS)
+
+
+@app.get("/api/insights")
+async def api_insights(request: Request):
+    """럭키 랩: 운 지수·이번 달 예산·당첨금 수령 기한(애드온이 본 기록 기준)."""
+    _require_ingress(request)
+    return JSONResponse(_insight_snapshot(), headers=_SECURITY_HEADERS)
+
+
+@app.get("/api/household/status")
+async def api_household_status(request: Request):
+    """가계부(kr_ledger_kit) 통합이 설치되어 있는지."""
+    _require_ingress(request)
+    return JSONResponse({"available": await _household_available()}, headers=_SECURITY_HEADERS)
+
+
+@app.get("/api/calendar.ics")
+async def api_calendar(request: Request):
+    """추첨·판매 마감·정기 자동 구매·당첨금 수령 기한 캘린더(.ics) 내려받기."""
+    _require_ingress(request)
+    from fastapi.responses import Response
+    now = FT.now_kst()
+    settings = _load_settings()
+    sched = settings["auto_buy"]["schedules"] if settings["auto_buy"]["enabled"] else []
+    labels = _labels()
+    body = IN.build_ics(now.date(), now, lotto=bool(config["enable_lotto645"]),
+                        pension=bool(config.get("enable_pension720", True)), schedules=sched,
+                        action_labels={a: action_label(a)[0] for a in FT.SCHED_ACTIONS}, labels=labels,
+                        claim_list=IN.claims(_get_ledger().entries, now.date()))
+    headers = dict(_SECURITY_HEADERS)
+    headers["Content-Disposition"] = 'attachment; filename="dhlotto45.ics"'
+    return Response(content=body, media_type="text/calendar; charset=utf-8", headers=headers)
 
 
 # ================================================================ v2.7.0 확장 기능
@@ -2721,11 +2789,15 @@ def _observe_sensor(account: AccountData, entity_id: str, state, attributes: dic
         )
         if items:
             led, now, new_wins, changed = _get_ledger(), FT.now_kst(), [], False
+            fresh = []
             for it in items:
                 if led.add(aid, it, now):
                     changed = True
+                    fresh.append(dict(it, acct=aid))
                     if it["kind"] == "win":
                         new_wins.append(it)
+            if fresh:
+                _queue_household(fresh)
             if changed:
                 try:
                     _write_json(FT.LEDGER_FILE, led.entries)
@@ -2817,6 +2889,188 @@ async def _after_purchase(acc_label: str, action: str, label: str, status: str, 
         await notify_user(title, msg, f"dhlotto45_purchase_{acc_label}")
 
 
+# ---------------------------------------------------------------- v2.12.0 럭키 랩: 예산·가계부·리포트
+_pending_spend: list = []          # 구매 직후 원장에 잡히기 전까지의 지출 [{acct, month, ts, cost}]
+_household_queue: list = []
+_household_task = None
+_insight_pub_at = 0.0
+INSIGHT_PUBLISH_SECONDS = 600
+
+
+def _budget_block_reason(account: Optional[AccountData], cost: int) -> str:
+    """월 예산을 넘는 구매면 사유 문자열. 예산이 꺼져 있으면 빈 문자열."""
+    if account is None or cost <= 0:
+        return ""
+    budget = _load_settings()["budget"]["monthly"]
+    if budget <= 0:
+        return ""
+    aid, _label = _alias_of(account.username)
+    st = IN.budget_status(_get_ledger().entries, _pending_spend, aid, FT.now_kst(), budget, cost)
+    return st["reason"]
+
+
+def _note_spend(account: AccountData, cost: int) -> None:
+    global _pending_spend
+    aid, _label = _alias_of(account.username)
+    now = FT.now_kst()
+    _pending_spend = IN.prune_pending(_pending_spend, now.timestamp())
+    _pending_spend.append({"acct": aid, "month": now.strftime("%Y-%m"), "ts": now.timestamp(), "cost": int(cost)})
+
+
+def _labels() -> dict:
+    return {aid: lb for aid, lb in _aliases().values()}
+
+
+def _queue_household(items: list) -> None:
+    """새 구매·당첨을 가계부(kr_ledger_kit)로 보낼 대기열에 넣는다(90초 모아서 회차별로 한 번에)."""
+    global _household_task
+    try:
+        if not _load_settings()["household"]["enabled"]:
+            return
+    except Exception:  # noqa: BLE001
+        return
+    _household_queue.extend(items)
+    if _household_task is None or _household_task.done():
+        _household_task = asyncio.get_event_loop().create_task(_flush_household())
+
+
+async def _flush_household() -> None:
+    await asyncio.sleep(90)
+    items = list(_household_queue)
+    _household_queue.clear()
+    payloads = IN.household_payloads(items, _labels(), FT.now_kst().date())
+    sent = 0
+    for pl in payloads:
+        if await _ha_post("services/kr_ledger/add_transaction", pl):
+            sent += 1
+    if payloads:
+        logger.info(f"[HOUSEHOLD] 가계부(kr_ledger)에 {sent}/{len(payloads)}건 기록")
+
+
+async def _ha_get(path: str):
+    """HA Core API GET(Supervisor 토큰). 실패하면 None."""
+    if not config["supervisor_token"]:
+        return None
+    import aiohttp
+    url = f"{config['ha_url']}/api/{path}"
+    headers = {"Authorization": f"Bearer {config['supervisor_token']}"}
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status >= 300:
+                    return None
+                return await resp.json(content_type=None)
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"[HA] GET {path} 실패: {e}")
+        return None
+
+
+async def _household_available() -> bool:
+    services = await _ha_get("services")
+    if not isinstance(services, list):
+        return False
+    for d in services:
+        if isinstance(d, dict) and d.get("domain") == "kr_ledger":
+            return "add_transaction" in (d.get("services") or {})
+    return False
+
+
+def _insight_snapshot(today=None) -> dict:
+    """대시보드 인사이트 카드·센서·리포트가 함께 쓰는 계산 결과."""
+    now = FT.now_kst()
+    today = today or now.date()
+    entries = _get_ledger().entries
+    settings = _load_settings()
+    budget = settings["budget"]["monthly"]
+    labels = _labels()
+    rows = []
+    for username in accounts:
+        aid, label = _alias_of(username)
+        rows.append({"id": aid, "label": label, "luck": IN.luck_index(entries, today, aid),
+                     "budget": IN.budget_status(entries, _pending_spend, aid, now, budget)})
+    claim_list = IN.claims(entries, today)
+    for c in claim_list:
+        c["label"] = labels.get(c["acct"], c["acct"])
+    return {"today": today.isoformat(), "accounts": rows, "all": {"luck": IN.luck_index(entries, today)},
+            "claims": claim_list, "budget_monthly": budget, "household": settings["household"]["enabled"],
+            "probabilities": {"lotto_any": round(IN.P_LOTTO_ANY, 6), "pension_any": IN.P_PENSION_ANY,
+                              "lotto_first": IN.LOTTO_COMBOS}}
+
+
+async def _publish_insight_sensors(snap: dict) -> None:
+    by_id = {r["id"]: r for r in snap["accounts"]}
+    for username, account in accounts.items():
+        aid, _label = _alias_of(username)
+        r = by_id.get(aid)
+        if not r:
+            continue
+        lk, bd = r["luck"], r["budget"]
+        if lk["percentile"] is not None:
+            await publish_sensor_for_account(account, "lotto45_luck_index", lk["percentile"], {
+                "top_pct": lk["top_pct"], "grade": lk["grade"], "games": lk["games"], "wins": lk["wins"],
+                "expected_wins": lk["expected"], "jackpot_years": lk["jackpot_years"],
+                "unit_of_measurement": "%", "friendly_name": "운 지수(백분위)", "icon": "mdi:clover",
+            })
+        await publish_sensor_for_account(account, "lotto45_month_spend", bd["used"], {
+            "month": bd["month"], "budget": bd["budget"], "left": bd["left"], "pct": bd["pct"],
+            "unit_of_measurement": "KRW", "friendly_name": "이번 달 복권 지출", "icon": "mdi:cash-register",
+        })
+        mine = [c for c in snap["claims"] if c["acct"] == aid and c["action"] == "visit" and c["days_left"] >= 0]
+        await publish_sensor_for_account(account, "lotto45_claim_deadline",
+                                         f"D-{mine[0]['days_left']}" if mine else "없음", {
+            "deadline": mine[0]["deadline"] if mine else None, "count": len(mine),
+            "claims": [{k: c[k] for k in ("game", "round", "info", "amount", "deadline", "days_left")} for c in mine[:5]],
+            "friendly_name": "당첨금 수령 기한", "icon": "mdi:calendar-alert",
+        })
+
+
+async def _insight_tick() -> None:
+    """30초마다: 인사이트 센서(10분 간격)·주간 리포트·토요일 마감 알림·수령 리마인더."""
+    global _insight_pub_at
+    now = FT.now_kst()
+    if time.monotonic() - _insight_pub_at >= INSIGHT_PUBLISH_SECONDS:
+        _insight_pub_at = time.monotonic()
+        await _publish_insight_sensors(_insight_snapshot())
+    settings = _load_settings()
+    n = settings["notify"]
+    st = _state()
+    today = now.date().isoformat()
+    if n["weekly_report"] and IN.in_window(now, 6, 9) and st.get("weekly_report") != today:
+        st["weekly_report"] = today
+        _save_state()
+        budgets = {aid: settings["budget"]["monthly"] for aid in _labels()}
+        title, body = IN.weekly_report(_get_ledger().entries, _labels(), now.date(), budgets, _pending_spend, now)
+        body = "\n".join(FT.safe_notify_text(line, 300) for line in body.splitlines())
+        await fire_event("dhlotto45_weekly_report", {"title": title})
+        await notify_user(title, body, "dhlotto45_weekly")
+    if n["deadline_reminder"] and config["enable_lotto645"] and IN.in_window(now, 5, 18) \
+            and st.get("deadline_reminder") != today:
+        st["deadline_reminder"] = today
+        _save_state()
+        rows = []
+        for username, account in accounts.items():
+            aid, label = _alias_of(username)
+            rows.append({"aid": aid, "label": label,
+                         "weekly_count": (account.sensor_cache.get("lotto45_weekly_purchase_count") or {}).get("state"),
+                         "logged_in": bool(account.enabled and account.lotto_645 and account.client
+                                           and account.client.logged_in)})
+        missing = IN.accounts_missing_lotto(rows, settings)
+        if missing:
+            await notify_user("⏰ 로또 판매 마감 2시간 전",
+                              f"{', '.join(missing)}: 이번 주 로또를 아직 사지 않았어요. 판매는 오늘 20:00에 마감됩니다.",
+                              "dhlotto45_deadline")
+    if n["claim_reminder"] and IN.in_window(now, None, 10, 0, 12 * 60) and st.get("claim_check") != today:
+        st["claim_check"] = today
+        sent = st.get("claim_sent") if isinstance(st.get("claim_sent"), dict) else {}
+        labels = _labels()
+        for c, stage in IN.claim_reminders_due(IN.claims(_get_ledger().entries, now.date()), sent):
+            title, body = IN.claim_message(labels.get(c["acct"], c["acct"]), c, stage)
+            await notify_user(title, FT.safe_notify_text(body, 400), f"dhlotto45_claim_{c['round']}")
+            sent = IN.mark_claim_sent(sent, c, stage, int(time.time()))
+        st["claim_sent"] = sent
+        _save_state()
+
+
 # ---------------------------------------------------------------- 정기 자동 구매
 def _auto_buy_block_reason(account: Optional[AccountData], action: str, amount: int) -> str:
     """자동 구매 전 추가 안전 점검. 막아야 하면 사유 문자열.
@@ -2840,7 +3094,7 @@ def _auto_buy_block_reason(account: Optional[AccountData], action: str, amount: 
             return f"예치금이 부족합니다 (구매 가능 {int(float(avail)):,}원, 필요 {amount:,}원)"
     except (TypeError, ValueError):
         pass
-    return ""
+    return _budget_block_reason(account, amount)
 
 
 async def _auto_buy_tick() -> None:
@@ -2889,6 +3143,12 @@ async def auto_buy_loop() -> None:
             raise
         except Exception as e:  # noqa: BLE001
             logger.error(f"[AUTO] 일정 처리 오류: {e}", exc_info=True)
+        try:
+            await _insight_tick()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"[INSIGHT] 처리 오류: {e}", exc_info=True)
         await asyncio.sleep(30)
 
 

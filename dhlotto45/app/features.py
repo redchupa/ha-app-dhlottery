@@ -16,6 +16,7 @@ import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
+import insights as IN
 from dashboard_api import (
     DashboardInputError,
     _clean_text,
@@ -51,9 +52,14 @@ DEFAULT_SETTINGS = {
         "purchase": True,            # 구매 결과 알림
         "low_deposit": True,         # 예치금 부족 알림
         "low_deposit_threshold": 5000,
+        "weekly_report": False,      # 일요일 09시 주간 리포트(v2.12.0)
+        "deadline_reminder": False,  # 토요일 18시 '이번 주 로또 아직 안 샀어요'
+        "claim_reminder": True,      # 직접 수령이 필요한 당첨금 기한 D-30·7·1
     },
     "favorites": [],
     "auto_buy": {"enabled": False, "schedules": []},
+    "budget": {"monthly": 0},        # 계정별 월 예산(원). 0 = 끄기
+    "household": {"enabled": False},  # kr_ledger_kit 가계부 자동 기록
 }
 
 
@@ -126,7 +132,7 @@ def normalize_settings(raw) -> dict:
     p = raw if isinstance(raw, dict) else {}
     n_in = p.get("notify") if isinstance(p.get("notify"), dict) else {}
     notify = dict(DEFAULT_SETTINGS["notify"])
-    for key in ("persistent", "win", "purchase", "low_deposit"):
+    for key in ("persistent", "win", "purchase", "low_deposit", "weekly_report", "deadline_reminder", "claim_reminder"):
         if isinstance(n_in.get(key), bool):
             notify[key] = n_in[key]
     svc = str(n_in.get("service") or "").strip()
@@ -148,7 +154,11 @@ def normalize_settings(raw) -> dict:
         if ns and ns["id"] not in {x["id"] for x in schedules}:
             schedules.append(ns)
     auto_buy = {"enabled": a_in.get("enabled") is True, "schedules": schedules}
-    return {"notify": notify, "favorites": favorites, "auto_buy": auto_buy}
+    b_in = p.get("budget") if isinstance(p.get("budget"), dict) else {}
+    budget = {"monthly": IN.normalize_budget(b_in.get("monthly"))}
+    h_in = p.get("household") if isinstance(p.get("household"), dict) else {}
+    household = {"enabled": h_in.get("enabled") is True}
+    return {"notify": notify, "favorites": favorites, "auto_buy": auto_buy, "budget": budget, "household": household}
 
 
 def merge_settings(current, change) -> dict:
@@ -161,6 +171,9 @@ def merge_settings(current, change) -> dict:
             base["favorites"] = change["favorites"]
         if isinstance(change.get("auto_buy"), dict):
             base["auto_buy"].update(change["auto_buy"])
+        for key in ("budget", "household"):
+            if isinstance(change.get(key), dict):
+                base[key].update(change[key])
     return normalize_settings(base)
 
 

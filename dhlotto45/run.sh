@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bashio
 
-bashio::log.info "Starting Lotto 45 Add-on v2.11.4 (Multi-Account)..."
+bashio::log.info "Starting Lotto 45 Add-on v2.12.0 (Multi-Account)..."
 
 # Build accounts JSON (최대 4계정). 비밀번호에 " \ 등 특수문자가 있어도 깨지지 않도록
 # 문자열을 이어 붙이지 않고 jq 로 options.json 에서 직접 만든다.

@@ -161,6 +161,16 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 .kv dt { color: var(--muted); } .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .big { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
 .hint { color: var(--muted); font-size: 13px; line-height: 1.55; }
+.luck { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.luck b { font-size: 30px; font-weight: 800; color: var(--gold); line-height: 1.1; }
+.luck span { font-size: 14px; font-weight: 700; }
+.gauge { position: relative; height: 12px; border-radius: 999px; background: var(--chip); overflow: hidden; margin: 8px 0 6px; }
+.gauge > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: linear-gradient(90deg, #3fa9de, var(--gold)); }
+.gauge.over > i { background: var(--lose); }
+.gauge > em { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .5; }
+.claim { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; background: var(--chip); margin-top: 6px; font-size: 13px; }
+.claim.visit { border-left: 4px solid var(--lose); }
+.claim .dd { font-weight: 800; white-space: nowrap; }
 .rows { display: flex; flex-direction: column; gap: 8px; }
 .row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--chip); min-width: 0; border: 1px solid transparent; }
 .compact .row { padding: 6px 8px; }
@@ -466,7 +476,24 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       autoNeedDay: "요일을 하나 이상 고르세요.", dayNames: "월,화,수,목,금,토,일",
       notify: "알림", nPersistent: "HA 알림(종 모양)", nService: "모바일 알림 서비스", nServicePh: "notify.mobile_app_내폰", nWin: "당첨 알림",
       nPurchase: "구매 결과 알림", nLow: "예치금 부족 알림", nThreshold: "부족 기준(원)", nTest: "테스트 알림", nTestOk: "보냈습니다. HA 알림·휴대폰을 확인하세요.",
-      nTestFail: "보내지 못했습니다. 알림 서비스 이름을 확인하세요.", nEvents: "자동화용 이벤트: dhlotto45_purchase · dhlotto45_win · dhlotto45_low_deposit",
+      nTestFail: "보내지 못했습니다. 알림 서비스 이름을 확인하세요.", nEvents: "자동화용 이벤트: dhlotto45_purchase · dhlotto45_win · dhlotto45_low_deposit · dhlotto45_weekly_report",
+      insight: "럭키 랩", q_insight: "럭키랩", luckTitle: "운 지수", luckTop: "상위", luckNone: "추첨이 끝난 구매 기록이 쌓이면 운 지수를 계산합니다.",
+      luck_legend: "🍀 전설급 행운", luck_lucky: "😊 운이 좋은 편", luck_average: "🙂 딱 평균", luck_unlucky: "😅 조금 아쉬운 편", luck_rain: "🌧️ 운이 쉬는 중",
+      luckDetail: "추첨 끝난 로또 {g}게임·연금 {p}매 · 확률상 기대 당첨 {e}회 · 실제 {w}회 · 환급률 {r}%",
+      luckJackpot: "지금 속도(주 {n}게임)라면 로또 1등 기대 시점은 약 {y}년 뒤입니다 (1등 확률 1/8,145,060).",
+      luckNote: "운 지수 = 산 복권 수로 기대되는 당첨 횟수와 실제 당첨 횟수를 비교한 백분위(이항분포 정확 계산). 재미로 보는 통계이며 다음 추첨 확률은 바뀌지 않습니다.",
+      budgetTitle: "이번 달 예산", budgetOff: "월 예산이 꺼져 있습니다 — ⏰ 설정에서 계정별 월 예산을 정하면 넘는 구매를 자동으로 막아 줍니다.",
+      budgetUsed: "사용", budgetLeft: "남음", budgetOver: "예산을 다 썼습니다 — 이번 달 추가 구매는 막힙니다.",
+      claimTitle: "당첨금 수령 도우미", claimNone: "직접 수령해야 할 당첨이 없습니다 (200만원 이하 인터넷 당첨금은 예치금으로 자동 지급).",
+      claimVisit: "직접 수령이 필요한 당첨: 신분증을 챙겨 수령처를 방문하세요. 지급기한은 추첨일부터 1년(추정)이며, 정확한 기한·수령처는 동행복권 '당첨금 지급 안내'를 확인하세요.",
+      claimAuto: "예치금 자동 지급", claimExpired: "기한 지남", icsBtn: "📅 캘린더 받기 (.ics)",
+      icsHint: "추첨·판매 마감·정기 자동 구매·수령 기한이 담긴 파일입니다. 휴대폰·구글 캘린더에서 가져오기 하세요.",
+      nWeekly: "📬 주간 리포트 (일요일 09시)", nDeadline: "⏰ 마감 알림 (토요일 18시, 이번 주 미구매 계정)", nClaim: "💰 당첨금 수령 기한 알림 (D-30·7·1)",
+      nBudget: "💳 계정별 월 예산 (원, 0 = 끄기)", nBudgetHint: "예산을 넘는 구매는 대시보드·HA 버튼·정기 자동 구매 모두에서 막힙니다.",
+      hhLabel: "🧾 가계부 자동 기록 (kr_ledger_kit)", hhHint: "kr_ledger_kit 통합이 있으면 구매는 지출, 당첨은 수입으로 회차별로 기록합니다 (카테고리: 복권).",
+      hhMissing: "kr_ledger_kit 통합을 찾지 못했습니다 — 설치한 뒤 다시 켜 주세요.", hhOk: "가계부 연동이 켜졌습니다.",
+      fairOk: "🔬 공정성 검정 (χ²={c}, p={p}, 번호 {n}개): 번호 쏠림은 우연 범위입니다 — 많이·적게 나온 번호는 다음 추첨에 영향이 없습니다.",
+      fairSkew: "🔬 공정성 검정 (χ²={c}, p={p}, 번호 {n}개): 이 표본에서는 쏠림이 보이지만, 추첨은 매번 독립입니다.",
       diag: "🩺 진단 리포트 복사", diagCopied: "진단 리포트를 복사했습니다. 문의 글에 붙여넣으세요 (아이디·IP는 가려져 있음).",
       diagManual: "아래 내용을 전체 선택해 복사하세요 (아이디·IP는 가려져 있음).", diagTitle: "진단 리포트", sSupport: "문의 · 진단",
       genMode: "방식", genRandom: "완전 무작위", genHot: "자주 나온 번호 위주", genCold: "덜 나온 번호 위주", genMix: "자주+덜 섞기",
@@ -521,7 +548,24 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       autoNeedDay: "Pick at least one day.", dayNames: "Mon,Tue,Wed,Thu,Fri,Sat,Sun",
       notify: "Notifications", nPersistent: "HA notifications (bell)", nService: "Mobile notify service", nServicePh: "notify.mobile_app_my_phone", nWin: "Win alerts",
       nPurchase: "Purchase results", nLow: "Low deposit alerts", nThreshold: "Low deposit below (KRW)", nTest: "Send test", nTestOk: "Sent. Check HA notifications and your phone.",
-      nTestFail: "Could not send. Check the notify service name.", nEvents: "Automation events: dhlotto45_purchase · dhlotto45_win · dhlotto45_low_deposit",
+      nTestFail: "Could not send. Check the notify service name.", nEvents: "Automation events: dhlotto45_purchase · dhlotto45_win · dhlotto45_low_deposit · dhlotto45_weekly_report",
+      insight: "Lucky Lab", q_insight: "Lab", luckTitle: "Luck index", luckTop: "Top", luckNone: "The luck index appears once some drawn tickets are recorded.",
+      luck_legend: "🍀 Legendary luck", luck_lucky: "😊 Luckier than most", luck_average: "🙂 Right on average", luck_unlucky: "😅 A bit unlucky", luck_rain: "🌧️ Luck is resting",
+      luckDetail: "Drawn: {g} lotto games · {p} pension tickets · expected wins {e} · actual {w} · return {r}%",
+      luckJackpot: "At your pace ({n} games a week) a lotto jackpot is expected in about {y} years (odds 1 in 8,145,060).",
+      luckNote: "Luck index = percentile of your actual wins against the wins expected from the tickets you bought (exact binomial). Just for fun: it never changes the odds of the next draw.",
+      budgetTitle: "This month's budget", budgetOff: "No monthly budget — set one per account in ⏰ settings and purchases over it are blocked automatically.",
+      budgetUsed: "Used", budgetLeft: "Left", budgetOver: "Budget used up — more purchases this month are blocked.",
+      claimTitle: "Prize claim helper", claimNone: "No prizes to claim in person (online prizes up to 2,000,000 won are credited to your deposit).",
+      claimVisit: "Claim in person: bring your ID to the claim office. The deadline is about one year from the draw; check DH Lottery's prize guide for the exact date and place.",
+      claimAuto: "Credited to deposit", claimExpired: "Expired", icsBtn: "📅 Download calendar (.ics)",
+      icsHint: "Draws, sales cut-off, scheduled purchases and claim deadlines. Import it into your phone or Google Calendar.",
+      nWeekly: "📬 Weekly report (Sunday 09:00)", nDeadline: "⏰ Cut-off reminder (Saturday 18:00, accounts without tickets)", nClaim: "💰 Prize claim deadline alerts (D-30·7·1)",
+      nBudget: "💳 Monthly budget per account (won, 0 = off)", nBudgetHint: "Purchases over the budget are blocked from the dashboard, HA buttons and schedules.",
+      hhLabel: "🧾 Household ledger (kr_ledger_kit)", hhHint: "With the kr_ledger_kit integration, purchases are recorded as expenses and wins as income, per round (category: 복권).",
+      hhMissing: "kr_ledger_kit integration not found — install it and turn this on again.", hhOk: "Household ledger sync is on.",
+      fairOk: "🔬 Fairness test (χ²={c}, p={p}, {n} numbers): the spread is within chance — hot and cold numbers do not affect the next draw.",
+      fairSkew: "🔬 Fairness test (χ²={c}, p={p}, {n} numbers): this sample looks skewed, but every draw is independent.",
       diag: "🩺 Copy diagnostic report", diagCopied: "Diagnostic report copied. Paste it into your question (IDs and IPs are hidden).",
       diagManual: "Select all of the text below and copy it (IDs and IPs are hidden).", diagTitle: "Diagnostic report", sSupport: "Support",
       genMode: "Mode", genRandom: "Fully random", genHot: "Mostly hot numbers", genCold: "Mostly cold numbers", genMix: "Hot + cold mix",
@@ -562,15 +606,16 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     { id: "aurora", g: "gNight", ko: "오로라", en: "Aurora", sw: "linear-gradient(135deg,#0f766e,#7c3aed)" },
     { id: "galaxy", g: "gNight", ko: "은하수 소원", en: "Galaxy Wish", sw: "linear-gradient(135deg,#1e1b4b,#be185d)" }
   ];
-  var DEFAULT_ORDER = ["summary", "buy", "receipt", "favorites", "lotto_current", "lotto_prev", "pension_current", "pension_prev", "winning", "numstats", "stats", "auto"];
+  var DEFAULT_ORDER = ["summary", "buy", "receipt", "favorites", "lotto_current", "lotto_prev", "pension_current", "pension_prev", "winning", "numstats", "stats", "insight", "auto"];
   var CARD_NAMES = { summary: "summary", buy: "buy", favorites: "favorites", lotto_current: "lottoCur", lotto_prev: "lottoPrev",
-    pension_current: "penCur", pension_prev: "penPrev", winning: "winning", stats: "stats", auto: "auto", receipt: "receipt", numstats: "numstats" };
+    pension_current: "penCur", pension_prev: "penPrev", winning: "winning", stats: "stats", auto: "auto", receipt: "receipt", numstats: "numstats", insight: "insight" };
 
   var prefs = {};
   try { prefs = JSON.parse(document.getElementById("dhl-prefs").textContent || "{}") || {}; } catch (e) { prefs = {}; }
   var data = null, current = null, timer = null, saveTimer = null, saveState = "";
   var settings = null, stats = null, statsScope = "all", modalOk = null;
   var numStats = null, numStatsAt = 0, numStatsErr = "", nsRounds = 50, nsView = "freq";
+  var insights = null, insightScope = "acc";
   var gen = { mode: "random", odd: false, sum: false, seq: false };
   var autoDraft = { action: "lotto_auto_1", time: "09:00", days: [5], account: "all" };
   var luckyIdx = Math.floor(Math.random() * 5);
@@ -631,7 +676,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   }
   var ART = { summary: "icon_wallet", buy: "icon_buy", favorites: "icon_favorite", lotto_current: "icon_lotto",
     lotto_prev: "icon_history", pension_current: "icon_pension", pension_prev: "icon_history", winning: "icon_winning",
-    stats: "icon_stats", auto: "icon_auto", receipt: "icon_history", numstats: "icon_numstats" };
+    stats: "icon_stats", auto: "icon_auto", receipt: "icon_history", numstats: "icon_numstats", insight: "icon_stats" };
   // Decorative image; if it fails to load, fall back to the emoji (or nothing).
   function art(name, cls, fallback) {
     var img = h("img", { cls: cls, src: "static/img/" + name + ".webp", alt: "", decoding: "async" });
@@ -1153,6 +1198,8 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       return h("span", { cls: "numlist" }, [ball(a.n), h("span", { cls: "gap", text: a.gap === null ? t("nsNever") : a.gap + t("nsAgo") })]);
     })));
     body.push(h("div", { cls: "hint mt8", text: t("nsExpected") + " " + ns.expected + t("nsTimes") + " · " + t("nsNote") }));
+    var fr = ns.fairness && (ns.fairness.total || ns.fairness.window);
+    if (fr) body.push(h("div", { cls: "hint mt8", text: t(fr.verdict === "random" ? "fairOk" : "fairSkew").replace("{c}", fr.chi2).replace("{p}", fr.p_value).replace("{n}", Number(fr.samples).toLocaleString()) }));
     return card("numstats", "🔢", t("numstats"), (ns.latest_round ? ns.latest_round + t("round") + " · " : "") + t("nsRounds") + " " + ns.window + t("round"), body);
   }
 
@@ -1212,6 +1259,58 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     return card("stats", "📊", t("stats"), "", body);
   }
 
+  // ------------------------------------------------------------ lucky lab (luck index · budget · claims · calendar)
+  function gauge(pct, marker, over) {
+    var g = h("div", { cls: "gauge" + (over ? " over" : "") }, [h("i"), marker === null ? null : h("em")]);
+    g.firstChild.style.width = Math.max(0, Math.min(100, Number(pct) || 0)) + "%";
+    if (marker !== null) g.lastChild.style.left = marker + "%";
+    return g;
+  }
+  function insightCard(acc) {
+    var body = [h("div", { cls: "seg" }, [["acc", t("statThis")], ["all", t("statAll")]].map(function (o) {
+      return h("button", { type: "button", "aria-pressed": insightScope === o[0] ? "true" : "false", text: o[1], onclick: function () { insightScope = o[0]; render(); } });
+    }))];
+    if (!insights) { body.push(h("div", { cls: "empty", text: "…" })); return card("insight", "🧠", t("insight"), "", body); }
+    var row = (insights.accounts || []).filter(function (r) { return r.id === acc.id; })[0] || {};
+    var lk = (insightScope === "all" ? insights.all.luck : row.luck) || {};
+    body.push(h("div", { cls: "sect", text: "🍀 " + t("luckTitle") }));
+    if (lk.percentile === null || lk.percentile === undefined) body.push(h("div", { cls: "empty", text: t("luckNone") }));
+    else {
+      body.push(h("div", { cls: "luck" }, [h("b", { text: t("luckTop") + " " + lk.top_pct + "%" }), h("span", { text: t("luck_" + lk.grade) })]));
+      body.push(gauge(lk.percentile, 50, false));
+      body.push(h("div", { cls: "hint", text: t("luckDetail").replace("{g}", lk.lotto_games).replace("{p}", lk.pension_tickets)
+        .replace("{e}", lk.expected).replace("{w}", lk.wins).replace("{r}", Number(lk.ratio).toLocaleString()) }));
+      if (lk.jackpot_years) body.push(h("div", { cls: "hint", text: t("luckJackpot").replace("{n}", lk.lotto_per_week).replace("{y}", Number(lk.jackpot_years).toLocaleString()) }));
+    }
+    if (insightScope === "acc") {
+      var bd = row.budget || {};
+      body.push(h("div", { cls: "sect", text: "💳 " + t("budgetTitle") + (bd.month ? " · " + bd.month : "") }));
+      if (!insights.budget_monthly) body.push(h("div", { cls: "hint", text: t("budgetOff") }));
+      else {
+        var over = bd.left !== null && bd.left <= 0;
+        body.push(h("dl", { cls: "kv" }, [h("dt", { text: t("budgetUsed") }), h("dd", { text: won(bd.used) + " / " + won(bd.budget) }),
+          h("dt", { text: t("budgetLeft") }), h("dd", { text: won(Math.max(0, bd.left)) })]));
+        body.push(gauge(bd.pct, null, over));
+        if (over) body.push(h("div", { cls: "hint", text: t("budgetOver") }));
+      }
+    }
+    body.push(h("div", { cls: "sect", text: "💰 " + t("claimTitle") }));
+    var cl = (insights.claims || []).filter(function (x) { return (insightScope === "all" || x.acct === acc.id) && x.days_left >= -30; });
+    var visit = cl.filter(function (x) { return x.action === "visit"; });
+    if (!visit.length) body.push(h("div", { cls: "hint", text: t("claimNone") }));
+    cl.slice(0, 6).forEach(function (x) {
+      body.push(h("div", { cls: "claim " + x.action }, [
+        h("span", { text: (insightScope === "all" ? x.label + " · " : "") + (x.game === "lotto" ? t("lottoShort") : t("pensionShort")) + " " + x.round + t("round") + " " + x.info + (x.amount ? " · " + won(x.amount) : "") }),
+        h("span", { cls: "dd", text: x.action === "auto" ? t("claimAuto") : (x.days_left >= 0 ? "D-" + x.days_left + " · " + x.deadline : t("claimExpired")) })]));
+    });
+    if (visit.length) body.push(h("div", { cls: "hint mt8", text: t("claimVisit") }));
+    body.push(h("div", { cls: "btns tight mt10" }, [h("button", { cls: "btn secondary small", type: "button", text: t("icsBtn"), onclick: function () { download("api/calendar.ics"); } })]));
+    body.push(h("div", { cls: "hint", text: t("icsHint") }));
+    body.push(h("div", { cls: "hint mt8", text: t("luckNote") }));
+    return card("insight", "🧠", t("insight"), lk.top_pct ? t("luckTop") + " " + lk.top_pct + "%" : "", body);
+  }
+  function loadInsights() { return getJson("api/insights").then(function (j) { insights = j; }).catch(function () {}); }
+
   // ------------------------------------------------------------ auto-buy & notifications
   function dayNames() { return t("dayNames").split(","); }
   function autoCard() {
@@ -1260,6 +1359,11 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     } })]));
     body.push(h("div", { cls: "hint", text: "🛡️ " + t("autoGuard") }));
     foldTail(body, addStart, "schedule-add", t("foldSchedule"));
+    var bud = h("input", { type: "text", inputmode: "numeric", value: String((settings.budget || {}).monthly || 0), "aria-label": t("nBudget"), onchange: function (e) {
+      var v = Number(String(e.target.value).replace(/[^0-9]/g, "")); saveSettings({ budget: { monthly: isFinite(v) ? v : 0 } }, function () { loadInsights().then(render); });
+    } });
+    body.push(h("div", { cls: "field" }, [h("span", { text: t("nBudget") }), bud]));
+    body.push(h("div", { cls: "hint", text: t("nBudgetHint") }));
 
     var notifyStart = body.length;
     function ntog(key, label) {
@@ -1279,6 +1383,16 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       var v = Number(String(e.target.value).replace(/[^0-9]/g, "")); saveSettings({ notify: { low_deposit_threshold: isFinite(v) ? v : 0 } });
     } });
     body.push(h("div", { cls: "field" }, [h("span", { text: t("nThreshold") }), thr]));
+    body.push(ntog("weekly_report", t("nWeekly")));
+    body.push(ntog("deadline_reminder", t("nDeadline")));
+    body.push(ntog("claim_reminder", t("nClaim")));
+    var hh = h("input", { type: "checkbox", checked: (settings.household || {}).enabled ? "checked" : null, "aria-label": t("hhLabel"), onchange: function (e) {
+      var on = e.target.checked;
+      saveSettings({ household: { enabled: on } });
+      if (on) getJson("api/household/status").then(function (j) { toast(j.available ? t("hhOk") : t("hhMissing"), j.available ? "ok" : "err"); }).catch(function () {});
+    } });
+    body.push(h("label", { cls: "field" }, [h("span", { text: t("hhLabel") }), hh]));
+    body.push(h("div", { cls: "hint", text: t("hhHint") }));
     body.push(h("div", { cls: "manual" }, [h("button", { cls: "btn secondary small", type: "button", text: "🔔 " + t("nTest"), onclick: function () {
       postJson("api/notify-test", {}).then(function (j) { toast(j.ok ? t("nTestOk") : t("nTestFail"), j.ok ? "ok" : "err"); }).catch(function (e) { toast(t("nTestFail") + " " + e.message, "err"); });
     } }), h("button", { cls: "btn secondary small", type: "button", text: t("diag"), onclick: copyDiag })]));
@@ -1370,7 +1484,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     });
     var builders = { summary: summaryCard, buy: buyCard, favorites: favoritesCard, lotto_current: lottoCurrentCard, lotto_prev: lottoPrevCard,
       pension_current: pensionCurrentCard, pension_prev: pensionPrevCard, winning: winningCard, stats: statsCard, auto: autoCard,
-      receipt: receiptCard, numstats: numStatsCard };
+      receipt: receiptCard, numstats: numStatsCard, insight: insightCard };
     var shown = [];
     var hidden = prefs.hidden_cards || [];
     (prefs.card_order || DEFAULT_ORDER).forEach(function (id) {
@@ -1392,7 +1506,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   function load() {
     fetch("api/dashboard", { credentials: "same-origin", cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error(r.status === 403 ? t("ingressOnly") : "HTTP " + r.status); return r.json(); })
-      .then(function (j) { data = j; syncCooldowns(j); return Promise.all([loadSettings(), loadStats(), loadNumStats(false)]); })
+      .then(function (j) { data = j; syncCooldowns(j); return Promise.all([loadSettings(), loadStats(), loadNumStats(false), loadInsights()]); })
       .then(function () { render(); })
       .catch(function (e) { render(); document.getElementById("notices").appendChild(h("div", { cls: "notice err", text: t("loadFail") + e.message })); })
       .then(schedule);

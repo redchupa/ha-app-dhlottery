@@ -111,11 +111,19 @@ async def _seed():
 
 
 asyncio.run(_seed())
+# 럭키 랩 카드가 게이지·수령 도우미까지 모두 그리도록 원장을 채운다(추첨 끝난 회차 + 직접 수령 당첨)
+_led = [{"key": f"seed:{r}:{i}", "acct": "account_1", "kind": "buy", "game": "lotto", "amount": 1000, "round": r,
+         "info": "", "month": M.FT.now_kst().strftime("%Y-%m"), "ts": 1} for r in range(1240, 1250) for i in range(5)]
+_led += [{"key": "seed-win:1", "acct": "account_1", "kind": "win", "game": "lotto", "amount": 5000, "round": 1245,
+          "info": "5등", "month": M.FT.now_kst().strftime("%Y-%m"), "ts": 2},
+         {"key": "seed-win:2", "acct": "account_1", "kind": "win", "game": "lotto", "amount": 2_500_000_000, "round": 1248,
+          "info": "1등", "month": M.FT.now_kst().strftime("%Y-%m"), "ts": 3}]
+M._ledger = M.FT.Ledger(_led)
 with open(os.path.join(DATA_DIR, "dashboard_settings.json"), "w", encoding="utf-8") as _f:
     json.dump({"favorites": [
         {"type": "lotto", "name": "지난주 번호", "numbers": "3,11,19,27,33,42"},
         {"type": "lotto", "name": "반자동", "numbers": "7,14,auto,auto,auto,auto"},
-        {"type": "pension", "name": "", "group": 2, "digits": "571903"}]}, _f, ensure_ascii=False)
+        {"type": "pension", "name": "", "group": 2, "digits": "571903"}], "budget": {"monthly": 30000}}, _f, ensure_ascii=False)
 
 
 def _free_port():
@@ -232,6 +240,14 @@ async def run():
             check(not m["broken"], f"{name}: 깨진 이미지 없음 {m['broken']}")
             check(not m["squeezed"], f"{name}: 번호·티켓이 눌려서 세로로 쌓이지 않음 {m['squeezed']}")
             check(not m["csp"], f"{name}: CSP 위반 없음 {m['csp']}")
+            lab = await _eval(tab, "JSON.stringify((() => { const c = document.querySelector('[data-card=insight]'); if (!c) return null;"
+                              " const g = c.querySelector('.gauge > i'); return { luck: !!c.querySelector('.luck b'),"
+                              " gauges: c.querySelectorAll('.gauge').length, visit: c.querySelectorAll('.claim.visit').length,"
+                              " fill: g ? g.style.width : '', ics: Array.from(c.querySelectorAll('button')).some(b => b.textContent.indexOf('.ics') >= 0),"
+                              " wide: c.scrollWidth > c.clientWidth + 1 }; })())")
+            check(lab and lab["luck"] and lab["gauges"] == 2 and lab["visit"] == 1 and lab["fill"].endswith("%") and lab["ics"],
+                  f"{name}: 럭키 랩 카드(운 지수·예산 게이지·수령 기한·캘린더) {lab}")
+            check(lab and not lab["wide"], f"{name}: 럭키 랩 카드가 화면 폭 안에 들어감")
             defaults = {"receipt", "winning", "numstats", "stats", "auto"}
             states = {c["id"]: c for c in m["collapsed"]}
             check(all(states[i]["expanded"] == "false" and states[i]["hidden"] for i in defaults if i in states),
