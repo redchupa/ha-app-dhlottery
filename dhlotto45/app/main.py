@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Lotto 45 Add-on Main Application v2.7.0
+Lotto 45 Add-on Main Application v2.7.1
 Home Assistant Add-on for DH Lottery 6/45
 v2.0.8 - Session keep-alive fix + retry path overhaul (full session reset on any error)
 """
@@ -113,7 +113,7 @@ class AccountData:
         # 대시보드에서 실행한 마지막 구매 작업 상태
         self.last_action: Optional[dict] = None
 
-APP_VERSION = "2.7.0"
+APP_VERSION = "2.7.1"
 FIXED_UPDATE_INTERVAL = 3600  # 센서 갱신 주기(초). v2.6.2 부터 설정 옵션 제거
 
 # Configuration variables
@@ -2345,7 +2345,7 @@ async def api_purchase(request: Request):
             if not config["enable_lotto645"] or not account.lotto_645:
                 raise DashboardInputError("로또 기능이 꺼져 있거나 로그인되지 않았습니다.")
             if not is_purchase_available_now():
-                raise DashboardInputError("지금은 로또 구매 불가 시간입니다 (토 20:00 ~ 일 06:00).")
+                raise DashboardInputError("지금은 로또 구매 불가 시간입니다 (매일 00:00~06:00, 토요일은 20:00부터).")
         elif not config.get("enable_pension720", True) or not account.pension:
             raise DashboardInputError("연금복권 기능이 꺼져 있습니다.")
         if action == "lotto_manual":
@@ -2563,7 +2563,7 @@ def _auto_buy_block_reason(account: Optional[AccountData], action: str, amount: 
         if not account.lotto_645 or not (account.client and account.client.logged_in):
             return "로또 로그인이 되어 있지 않습니다"
         if not is_purchase_available_now():
-            return "로또 판매 시간이 아닙니다 (토 20:00 ~ 일 06:00)"
+            return "로또 판매 시간이 아닙니다 (매일 00:00~06:00, 토요일은 20:00부터)"
     elif not account.pension:
         return "연금복권 구매를 쓸 수 없습니다 (chromium 미설치 기기)"
     avail = (account.sensor_cache.get("lotto45_balance") or {}).get("attributes", {}).get("purchase_available")

@@ -249,6 +249,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 16px; }
 .mini { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 2px 8px; cursor: pointer; }
 .mini:disabled { opacity: .35; cursor: default; }
 .saved { font-size: 12px; color: var(--muted); min-height: 18px; }
+.notice .closed { margin-top: 4px; line-height: 1.5; }
 .notice.ok { border-color: #8bd3a0; background: color-mix(in srgb, #8bd3a0 16%, var(--card)); }
 .btn.small { padding: 6px 10px; font-size: 13px; border-radius: 9px; }
 .row.fav .fname { min-width: 56px; max-width: 96px; font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -323,7 +324,9 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       luckyPick: "🍀 행운 번호 뽑기", manualHint: "6칸을 쉼표로 구분 · 자동으로 채울 칸은 auto (반자동)",
       running: "진행 중… (연금은 최대 1~2분)", confirmTitle: "구매 확인", cancel: "취소", confirm: "구매",
       confirmBody1: " 계정으로 ", confirmBody2: " 을(를) 구매합니다. 예치금에서 바로 결제됩니다.",
-      lottoClosed: "지금은 로또 구매 불가 시간입니다 (토 20:00 ~ 일 06:00). 로또 버튼이 잠겨 있습니다.",
+      lottoClosed: "🌙 지금은 로또 구매 불가 시간이에요 (매일 00:00~06:00, 토요일은 20:00부터)",
+      closedBody: "이 시간에는 동행복권에서 예치금·구매 내역을 새로 조회하지 않아 마지막으로 불러온 값이 보여요. 06:00가 지나면 자동으로 다시 불러옵니다. 당첨번호와 통계는 계속 갱신돼요.",
+      lottoName: "로또 복권", pensionName: "연금 복권", lottoShort: "로또", pensionShort: "연금",
       loginErr: "로그인 오류", lottoErr: "로또 구매 오류", penErr: "연금 구매 오류", loadFail: "불러오기 실패: ", buyFail: "구매 요청 실패: ",
       noAcc: "설정된 계정이 없습니다. 애드온 설정에서 계정을 추가하세요.", ingressOnly: "사이드바(Ingress)에서 열어야 볼 수 있습니다.",
       nextLotto: "로또 추첨까지", nextPension: "연금 추첨까지", day: "일", lastPrize: "지난 회차 1등 당첨금", latestDraw: "회 당첨번호",
@@ -359,7 +362,9 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       luckyPick: "🍀 Lucky pick", manualHint: "6 values, comma separated · use auto to fill the rest",
       running: "in progress… (pension takes up to 1-2 min)", confirmTitle: "Confirm purchase", cancel: "Cancel", confirm: "Buy",
       confirmBody1: " will buy ", confirmBody2: ". It is paid from the deposit right away.",
-      lottoClosed: "Lotto sales are closed now (Sat 20:00 - Sun 06:00 KST). Lotto buttons are locked.",
+      lottoClosed: "🌙 Lotto sales are closed now (daily 00:00-06:00, Saturday from 20:00 KST)",
+      closedBody: "During this time the deposit and purchase history are not fetched from DH Lottery, so the last loaded values are shown. They refresh automatically after 06:00. Winning numbers and statistics keep updating.",
+      lottoName: "Lotto 6/45", pensionName: "Pension 720+", lottoShort: "Lotto", pensionShort: "Pension",
       loginErr: "Login error", lottoErr: "Lotto purchase error", penErr: "Pension purchase error", loadFail: "Failed to load: ", buyFail: "Purchase request failed: ",
       noAcc: "No accounts configured. Add one in the add-on settings.", ingressOnly: "Open this from the Home Assistant sidebar (Ingress).",
       nextLotto: "Next lotto draw", nextPension: "Next pension draw", day: "d", lastPrize: "Last 1st prize", latestDraw: " · winning numbers",
@@ -529,7 +534,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     var right = h("div", { cls: "hero-right" });
     var la = at(acc, "lotto645_winning_numbers");
     if ((la.numbers || []).length) {
-      right.appendChild(h("div", { cls: "lbl", text: "LOTTO 6/45 · " + (la.round || "") + t("latestDraw") }));
+      right.appendChild(h("div", { cls: "lbl", text: t("lottoName") + " · " + (la.round || "") + t("latestDraw") }));
       right.appendChild(h("div", { cls: "hero-balls" }, balls(la.numbers).concat([h("span", { cls: "plus", text: "+" }), ball(la.bonus)])));
     }
     var fp = st(acc, "lotto645_first_prize");
@@ -602,11 +607,11 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
   function winningCard(acc) {
     var la = at(acc, "lotto645_winning_numbers"), pa = at(acc, "pension720_winning_number"), body = [];
     if ((la.numbers || []).length) {
-      body.push(h("div", { cls: "hint", text: "LOTTO 6/45 · " + la.round + t("round") }));
+      body.push(h("div", { cls: "hint", text: "🎱 " + t("lottoName") + " · " + la.round + t("round") }));
       body.push(h("div", { cls: "row" }, [h("span", { cls: "main" }, balls(la.numbers).concat([h("span", { cls: "plus", text: "+" }), ball(la.bonus)]))]));
     }
     if (pa.number) {
-      body.push(h("div", { cls: "hint", text: "PENSION 720+ · " + pa.round + t("round") }));
+      body.push(h("div", { cls: "hint", text: "🎟️ " + t("pensionName") + " · " + pa.round + t("round") }));
       body.push(h("div", { cls: "row" }, [h("span", { cls: "main" }, [ticket(pa.group, pa.number)]), h("span", { cls: "res r-wait", text: pa.bonus ? t("bonus") + " " + pa.bonus : "" })]));
     }
     if (!body.length) body.push(h("div", { cls: "empty", text: t("notLoaded") }));
@@ -618,7 +623,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       return h("button", { cls: "btn" + (extra || ""), type: "button", disabled: (running || disabled) ? "disabled" : null, onclick: function () { ask(acc, action); }, text: label });
     }
     if (data.lotto_enabled) {
-      body.push(h("div", { cls: "sect", text: "🎱 LOTTO 6/45" }));
+      body.push(h("div", { cls: "sect", text: "🎱 " + t("lottoName") }));
       body.push(h("div", { cls: "btns" }, [btn(t("auto1"), "lotto_auto_1", "", !avail), btn(t("auto5"), "lotto_auto_5", "", !avail)]));
       var dr = draft(acc);
       var li = h("input", { cls: "lotto mono", id: "lotto-manual", value: dr.lotto !== undefined ? dr.lotto : (acc.manual_numbers || ""), oninput: function () { dr.lotto = li.value; }, placeholder: "1,7,12,auto,auto,auto", "aria-label": t("manual1"), autocomplete: "off" });
@@ -635,7 +640,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       body.push(h("div", { cls: "hint", text: t("manualHint") + " · " + t("genNote") }));
     }
     if (data.pension_enabled) {
-      body.push(h("div", { cls: "sect", text: "🎟️ PENSION 720+" }));
+      body.push(h("div", { cls: "sect", text: "🎟️ " + t("pensionName") }));
       body.push(h("div", { cls: "btns" }, [btn(t("pAuto1"), "pension_auto_1"), btn(t("pAuto5"), "pension_auto_5")]));
       var pd = draft(acc), pm = String(acc.pension_manual || "").split(",");
       var pg = pd.group !== undefined ? pd.group : (pm[0] || "").trim(), pn = pd.digits !== undefined ? pd.digits : (pm[1] || "").trim();
@@ -759,7 +764,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
       if ((stats.recent_wins || []).length) {
         body.push(h("div", { cls: "sect", text: "🎉 " + t("statWins") }));
         body.push(h("div", { cls: "rows" }, stats.recent_wins.slice(0, 5).map(function (w) {
-          return h("div", { cls: "row won" }, [h("span", { cls: "main", text: (stats.labels && stats.labels[w.acct] || w.acct) + " · " + (w.game === "lotto" ? "LOTTO" : "PENSION") + " " + w.round + t("round") + " " + w.info }),
+          return h("div", { cls: "row won" }, [h("span", { cls: "main", text: (stats.labels && stats.labels[w.acct] || w.acct) + " · " + (w.game === "lotto" ? t("lottoShort") : t("pensionShort")) + " " + w.round + t("round") + " " + w.info }),
             h("span", { cls: "res r-gold", text: w.amount ? won(w.amount) : "-" })]);
         })));
       }
@@ -914,7 +919,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 22px
     var acc = currentAcc();
     renderHero(acc);
     renderCelebrate(acc);
-    if (!data.purchase_available) notes.appendChild(h("div", { cls: "notice warn", text: t("lottoClosed") }));
+    if (!data.purchase_available) notes.appendChild(h("div", { cls: "notice warn" }, [h("b", { text: t("lottoClosed") }), h("div", { cls: "hint closed", text: t("closedBody") })]));
     [["lotto45_login_error", "loginErr"], ["lotto45_purchase_error", "lottoErr"], ["pension720_purchase_error", "penErr"]].forEach(function (p) {
       var v = st(acc, p[0]); if (v && v !== "없음") notes.appendChild(h("div", { cls: "notice err", text: t(p[1]) + ": " + v }));
     });
